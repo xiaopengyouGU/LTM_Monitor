@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "MinGW-Qt",
+            "includePath": [
+                "${workspaceFolder}/**",                    // 利用智能感知
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/src/drivers/**",
+                "${workspaceFolder}/src/drivers/data_def",
+                "D:/Qt/6.5.11/mingw_64/include/**"          // <-- 添加 Qt 头文件根目录
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+                // 如果需要，可以在这里添加 Qt 相关的宏，如 QT_CORE_LIB 等
+            ],
+            "compilerPath": "D:/Qt/Tools/mingw1120_64/bin/gcc.exe", //gcc编译器路径,Qt自带的，避免版本不一致导致的故障
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}
