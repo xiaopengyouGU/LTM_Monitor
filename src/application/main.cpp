@@ -1,6 +1,4 @@
 #include "mainwindow.h"
-#include "protocol.h"
-#include <stdio.h>
 #include <QApplication>
 
 int main(int argc, char *argv[])

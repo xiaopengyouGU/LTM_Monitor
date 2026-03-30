@@ -7,9 +7,9 @@ import argparse
 #使用Qt自带的gcc编译器，否则可能出现版本不一致导致的奇怪问题：
 #如：Debug模式下，程序不运行，但是Release模式下程序正常运行
 # 项目配置
-PROJECT_NAME = "LTM_Monitor_V_0_1"                 #可执行文件名
+PROJECT_NAME = "LTM_Monitor"                           #可执行文件名
 QT_PREFIX_PATH = "D:/Qt/6.5.11/mingw_64"           #Qt文件路径
-INSTALL_DIR = "D:/LTM_Monitor"                     #软件安装目录
+INSTALL_DIR = "D:/LTM_Project"                     #软件安装目录
 QT_BIN_PATH = os.path.join(QT_PREFIX_PATH, "bin")
 BUILD_DIR = "build"                                 
 
@@ -50,10 +50,55 @@ def run_executable(build_type):
     return True
 
 def run_install():
+    """安装项目"""
+    # 清理旧的 include 目录
+    include_dir = os.path.join(INSTALL_DIR, "include")
+    if os.path.exists(include_dir):
+        print(f">>> 清理旧的 include 目录: {include_dir}")
+        shutil.rmtree(include_dir, ignore_errors=True)
+    
+    # 执行 CMake 安装
     install_cmd = ["cmake", "--install", BUILD_DIR]
-    print(">>> 安装项目 ...")
+    print(">>> 安装项目到:", INSTALL_DIR)
     result = subprocess.run(install_cmd, check=False)
-    return result.returncode == 0
+    
+    if result.returncode != 0:
+        return False
+    
+    # 手动复制所有需要的 Qt DLL（跳过 windeployqt）
+    bin_dir = os.path.join(INSTALL_DIR, "bin")
+    
+    # 需要复制的 DLL 列表（根据你的实际需求）
+    required_dlls = [
+        "Qt6Core.dll",
+        "Qt6Gui.dll",
+        "Qt6Widgets.dll",
+        "Qt6Charts.dll",
+        "Qt6OpenGL.dll",
+        "Qt6Concurrent.dll",
+        "Qt6OpenGLWidgets.dll",
+        "Qt6SerialPort.dll",
+        #"Qt6PrintSupport.dll",  # 可选，但 Charts 可能需要
+    ]
+    
+    print(">>> 手动复制 Qt DLL...")
+    for dll in required_dlls:
+        src = os.path.join(QT_BIN_PATH, dll)
+        if os.path.exists(src):
+            shutil.copy2(src, bin_dir)
+            print(f"  复制: {dll}")
+        else:
+            print(f"  ⚠️ 跳过（不存在）: {dll}")
+    
+    # 复制 platforms 插件（必须）
+    platforms_src = os.path.join(QT_BIN_PATH, "platforms")
+    platforms_dst = os.path.join(bin_dir, "platforms")
+    if os.path.exists(platforms_src):
+        shutil.copytree(platforms_src, platforms_dst, dirs_exist_ok=True)
+        print("✅ 复制 platforms 插件")
+    
+    print(f"✅ 安装成功！程序位置: {os.path.join(bin_dir, f'{PROJECT_NAME}.exe')}")
+    return True
 
 def clean_build():
     if os.path.exists(BUILD_DIR):
@@ -63,7 +108,7 @@ def clean_build():
         print(">>> 构建目录不存在，无需清理。")
 
 def main():
-    parser = argparse.ArgumentParser(description="LTM_Monitor 项目构建与运行脚本")
+    parser = argparse.ArgumentParser(description="UIM_Project 项目构建与运行脚本")
     group = parser.add_mutually_exclusive_group()   #使用了互斥组，所以最多只能有一个选项
     group.add_argument("-b", "--build-only", action="store_true", help="仅构建 Debug 版本（不运行）")
     group.add_argument("-D", "--debug-run", action="store_true", help="构建并运行 Debug 版本")
