@@ -15,6 +15,23 @@
 
 > 以上截图来自实际运行环境，界面可能因版本更新略有差异。
 
+---
+
+## 通讯协议移植
+
+本项目定义了一套轻量级的**通讯协议**，用于上位机与下位机（如单片机）之间的数据交换。协议设计简洁，易于移植到各种嵌入式平台。
+
+协议源码位于 **`example/protocol/`** 目录，采用纯 C 语言实现，无额外依赖，可直接集成到 ARM Cortex-M 等平台。
+
+同时，我们在 **`example/stm32f103/`** 目录下提供了一个完整的 **STM32F103 开发板移植示例**，包含：
+- 串口收发驱动适配
+- 协议数据帧的封装与解析
+- 与上位机联调的演示代码
+
+如果你需要将通讯协议移植到其他单片机（如 GD32、ESP32 等），可参考该示例进行适配。具体使用方法请直接阅读示例工程中的源码注释。
+
+---
+
 ## 系统要求
 
 - **操作系统**：Windows 10 / 11（64位）
@@ -68,6 +85,9 @@ gcc --version        # 应显示 Qt 自带的 MinGW gcc 版本
 ### 1. 项目目录结构（关键部分）
 ```
 LTM_Monitor/
+├── example/                   # 示例工程（通讯协议移植参考）
+│   ├── protocol/              # 通讯协议实现（C语言）
+│   └── stm32f103/             # STM32F103开发板移植示例
 ├── src/
 │   ├── modules/               # 动态库模块
 │   │   ├── chart/             # 图表动态库（提供实时曲线功能）
@@ -168,9 +188,11 @@ cmake --install . --prefix D:/LTM_Project
 
 | 目录 | 内容 |
 |------|------|
-| `src/modules/chart`  | 图表动态库（提供实时曲线功能）   |
-| `src/modules/serial` | 串口通讯动态库（封装 QtSerialPort）|
-| `src/modules/record` | 数据记录动态库（数据库、日志系统）|
+| `example/protocol`      | 通讯协议 C 源码（平台无关） |
+| `example/stm32f103`     | STM32F103 移植示例工程 |
+| `src/modules/chart`     | 图表动态库（提供实时曲线功能）   |
+| `src/modules/serial`    | 串口通讯动态库（封装 QtSerialPort）|
+| `src/modules/record`    | 数据记录动态库（数据库、日志系统）|
 | `src/ui_widgets/chart_dialog` | 图表设置对话框 |
 | `src/ui_widgets/main_window`  | 主窗口 |
 | `src/application/main.cpp`  | 主程序入口，链接上述模块 |
