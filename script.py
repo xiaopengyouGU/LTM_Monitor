@@ -78,6 +78,7 @@ def run_install():
         "Qt6Concurrent.dll",
         "Qt6OpenGLWidgets.dll",
         "Qt6SerialPort.dll",
+        "Qt6Sql.dll",
         #"Qt6PrintSupport.dll",  # 可选，但 Charts 可能需要
     ]
     

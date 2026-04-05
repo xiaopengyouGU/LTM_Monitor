@@ -54,6 +54,8 @@ install(TARGETS ${APP_NAME}
 set(MODULE_TARGETS
     chart
     serial
+    record
+    log_analysis
     chart_dialog
     main_window
     # 如果有其他模块，继续添加
@@ -69,17 +71,24 @@ foreach(target ${MODULE_TARGETS})
 endforeach()
 
 # 3. 安装每个模块的头文件（直接平铺到 include/ 下，模块间需保证文件名唯一）
-install(DIRECTORY src/modules/chart/include/ DESTINATION include)
-install(DIRECTORY src/modules/serial/include/ DESTINATION include)
-install(DIRECTORY src/ui_widgets/main_window/include/ DESTINATION include)
-install(DIRECTORY src/ui_widgets/chart_dialog/include/ DESTINATION include)
+install(DIRECTORY src/modules/chart/include/ DESTINATION include/chart)
+install(DIRECTORY src/modules/serial/include/ DESTINATION include/serial)
+install(DIRECTORY src/modules/record/include/ DESTINATION include/record)
+install(DIRECTORY src/ui_widgets/log_analysis/include/ DESTINATION include/log_analysis)
+install(DIRECTORY src/ui_widgets/main_window/include/ DESTINATION include/main_window)
+install(DIRECTORY src/ui_widgets/chart_dialog/include/ DESTINATION include/chart_dialog)
 # 如果有其他模块，继续添加
 
-# # 4. 安装第三方 DLL（例如 motion 模块的 LTSMC.dll）
-# set(LTSMC_DLL ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/motion/third_party/LTSMC/lib/LTSMC.dll)
-# if(EXISTS ${LTSMC_DLL})
-#     install(FILES ${LTSMC_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-# endif()
+# 4. 安装第三方库
+# 安装 SQLite 驱动插件文件夹到可执行文件所在目录
+set(SQLDRIVERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/sqldrivers)
+if(EXISTS ${SQLDRIVERS_DIR})
+    install(DIRECTORY ${SQLDRIVERS_DIR}
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        USE_SOURCE_PERMISSIONS
+        FILES_MATCHING PATTERN "*.dll"
+    )
+endif()
 # 如果有其他第三方 DLL，同理
 
 # 5. 生成 Qt 部署脚本（将 Qt 运行时依赖复制到安装目录）

@@ -5,16 +5,25 @@
 #include "status_bar.h"
 #include "chart.h"
 #include "serial.h"
+#include "record.h"
+#include "log_analysis.h"
 #include "chart_dialog.h"
 #include "window_data_processor.h"
 
+#define LOG_DEBUG(msg)  {if(record_manager) record_manager->logDebug(msg);}
+#define LOG_INFO(msg)   {if(record_manager) record_manager->logInfo(msg);}
+#define LOG_WARN(msg)   {if(record_manager) record_manager->logWarn(msg);}
+#define LOG_ERROR(msg)  {if(record_manager) record_manager->logError(msg);}
+
 static void setLabelColor(QLabel *label, const QString &color);
 static void initPidData(pid_data_t *data);
+
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
     buildUI_StatusBar();
+    buildRecord();                      //构造日志和数据库
     buildChart();                       //先构造图表
     buildUI_SerialPort();               //再构造串口
     buildUI_Others();
@@ -54,14 +63,19 @@ void MainWindow::buildUI_SerialPort()
     process_thread->start();                  //数据处理线程启动
 }
 
-void MainWindow::buildDB()                    //数据库创建
+void MainWindow::buildRecord()             //日志与数据库创建
 {
-    //m_sql = new SqlManager();
+    record_manager = new RecordManager(this);
+    log_analysis = new LogAnalysis(this);
+    log_analysis->connectManager(record_manager);          //绑定记录管理器
+    log_analysis->close();                                 //先不要显示
+    record_manager->start();                               //启动记录管理器
+    LOG_DEBUG("测试日志系统");
+    LOG_INFO("日志系统初始化完毕");       
 }
 
 void MainWindow::buildChart()
-{
-    //设置5个通道
+{   //设置5个通道
     chart_manager = new ChartManager(5, this);              //创建图表管理器，负责图表模块对象管理
     ui->chartView->installEventFilter(this);                //安装事件管理器，启动鼠标双击事件
     ui->chartView->setChartManager(chart_manager);          //配置图表管理器
@@ -151,11 +165,13 @@ void MainWindow::do_serialOpened(bool success, const QString& msg)
         ui->btnSerial->setText("关闭串口");  
         m_status->setInfo(msg); 
         QMessageBox::information(this, "信息", msg);
+        LOG_INFO("打开串口成功");
     }
     else
     {      
         m_status->setInfo(msg); 
         QMessageBox::critical(this, "错误", msg); 
+        LOG_ERROR("打开串口失败");
     }
 }
 
@@ -331,6 +347,12 @@ void MainWindow::on_actImportDB_triggered()
     //     setLabelInfo(labInfo, "打开数据库失败");
     //     QMessageBox::warning(this, "错误", "打开数据库失败");
     // }
+}
+
+void MainWindow::on_actOpenLog_triggered()                 //打开日志分析器
+{
+    log_analysis->show();                                  
+    m_status->setInfo("打开日志分析器");
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)

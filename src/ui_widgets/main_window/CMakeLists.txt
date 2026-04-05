@@ -49,7 +49,9 @@ target_link_libraries(${PROJECT_NAME}   PUBLIC
 target_link_libraries(${PROJECT_NAME}   PUBLIC
         chart
         serial
+        record
         chart_dialog
+        log_analysis
 ) 
 
 # 添加资源文件

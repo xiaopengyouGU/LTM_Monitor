@@ -24,6 +24,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         main_window
         chart_dialog
+        log_analysis
 )
 
 # 确保运行时能找到依赖的动态库（因输出目录统一，无需额外操作）

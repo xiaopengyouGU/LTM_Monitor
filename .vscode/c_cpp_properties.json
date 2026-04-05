@@ -7,6 +7,7 @@
                 "${workspaceFolder}/src/**",
                 "${workspaceFolder}/src/modules/**",
                 "${workspaceFolder}/src/application/**",
+                "${workspaceFolder}/src/components/**",
                 "${workspaceFolder}/src/ui_widgets/**",
                 "${workspaceFolder}/src/ui_widgets/main_window/**",     
                 "D:/Qt/6.5.11/mingw_64/include/**"          // <-- 添加 Qt 头文件根目录

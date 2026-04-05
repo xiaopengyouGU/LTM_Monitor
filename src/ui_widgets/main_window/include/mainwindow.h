@@ -39,6 +39,8 @@ struct pid_data_t{
 
 class ChartManager;             //前向声明
 class SerialManager;
+class RecordManager;
+class LogAnalysis;                          
 class StatusBar;
 class ChartDialog;
 class WindowDataProcessor;
@@ -50,7 +52,7 @@ class MainWindow : public QMainWindow
 private:
     void buildUI();                    //UI创建
     // void buildMenu();               //菜单栏
-    void buildDB();                    //数据库创建
+    void buildRecord();                //日志与数据库创建
     void buildChart();                 //绘图
     void buildUI_SerialPort();         //串口端口设置
     void buildUI_StatusBar();          //状态栏设置
@@ -90,7 +92,7 @@ private slots:
 
     //菜单栏对应的槽函数
     void on_actImportDB_triggered();                //打开数据库
-
+    void on_actOpenLog_triggered();                 //打开日志分析器
 private:
     Ui::MainWindow *ui;
    
@@ -100,6 +102,10 @@ private:
     ChartManager    *chart_manager;     //图表管理器
     ChartDialog     *m_dialog;          //图表控制对话框
     SerialManager   *serial_manager;    //串口管理器
+    
+    RecordManager   *record_manager;    //记录管理器
+    LogAnalysis     *log_analysis;      //日志分析器
+    
     QThread         *process_thread;    //数据处理线程
     WindowDataProcessor *processor;     //窗口数据处理器
     QList<pid_data_t> pid_datas;        //保存了5个通道的目标值

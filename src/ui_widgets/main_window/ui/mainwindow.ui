@@ -803,6 +803,7 @@
     <property name="title">
      <string>日志系统</string>
     </property>
+    <addaction name="actOpenLog"/>
    </widget>
    <widget class="QMenu" name="menu">
     <property name="title">
@@ -851,6 +852,20 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+D</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::NoRole</enum>
+   </property>
+  </action>
+  <action name="actOpenLog">
+   <property name="text">
+    <string>打开日志分析器</string>
+   </property>
+   <property name="toolTip">
+    <string>打开日志分析器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
