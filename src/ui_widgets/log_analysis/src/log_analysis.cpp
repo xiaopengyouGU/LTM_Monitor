@@ -1,6 +1,7 @@
 #include "log_analysis.h"
 #include "ui_log_analysis.h"
 #include "record_manager.h"   // 完整定义，用于调用解析接口
+#include "log_table_model.h"
 #include <QFileDialog>
 #include <QMessageBox>
 

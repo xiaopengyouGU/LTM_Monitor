@@ -37,7 +37,9 @@ void SerialManager::Private::start()
 }
 
 void SerialManager::Private::stop()
-{
+{   //避免出现定时器被UI线程关闭的情况
+    QMetaObject::invokeMethod(m_worker, &SerialWorker::stop, Qt::BlockingQueuedConnection);
+    // 停止所有线程的事件循环(关闭内部定时器等)
     data_thread->quit();
     data_thread->wait();
 }

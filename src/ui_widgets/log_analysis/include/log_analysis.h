@@ -3,10 +3,10 @@
 
 #include <QWidget>
 #include <QSortFilterProxyModel>
-#include "log_table_model.h"
 
 // 前向声明，提高编译速度
 class RecordManager;
+class LogTableModel;
 struct RecordData;   
 
 namespace Ui {

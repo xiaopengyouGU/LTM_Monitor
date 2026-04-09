@@ -96,7 +96,6 @@ private slots:
 private:
     Ui::MainWindow *ui;
    
-
 private:
     StatusBar       *m_status;          //自定义状态栏
     ChartManager    *chart_manager;     //图表管理器

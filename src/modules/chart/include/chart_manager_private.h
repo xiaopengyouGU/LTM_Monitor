@@ -8,6 +8,7 @@ class DataImporter;
 class DataExporter;
 
 #include "chart_manager.h"
+#include <QFutureWatcher>
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -109,6 +110,7 @@ private:
     QTimer *m_timer;
     ChartView     *m_chartView;             //视图对象
     bool m_isUpdating = false;   // 是否正在执行并行降采样任务
+    QFutureWatcher<SeriesResult>* m_activeWatcher = nullptr;  // 跟踪当前活动的并行任务
 // private:                         //压力测试
 //     int m_updateTotal = 0;
 //     int m_updateSkipped = 0;

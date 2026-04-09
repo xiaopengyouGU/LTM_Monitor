@@ -33,6 +33,7 @@ MainWindow::~MainWindow()
 {
     process_thread->quit();
     process_thread->wait();
+
     delete processor;
     delete ui;
 }

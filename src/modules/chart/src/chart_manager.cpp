@@ -8,7 +8,6 @@
 #include <limits>
 #include <QFuture>
 #include <QtConcurrent>
-#include <QFutureWatcher>
 
 #include "chart_manager.h"
 #include "chart_manager_private.h"
@@ -17,7 +16,6 @@
 #include "data_exporter.h"
 #include "chart_def.h"
 #include "chart_view.h"
-
 // ========== 私有实现类 ==========
 // Private 构造函数
 ChartManager::Private::Private(int channelCount, ChartManager *parent)
@@ -36,17 +34,15 @@ ChartManager::Private::Private(int channelCount, ChartManager *parent)
 ChartManager::Private::~Private()
 {
     stop();                 //停止图表管理器
-    for (int i = 0; i < m_count; ++i) 
-    {
-        m_chart->removeSeries(m_actualSeries[i]);
-        m_chart->removeSeries(m_targetSeries[i]);
+    // 等待并发绘图任务完成，避免访问已销毁的 m_storage 等成员
+    if (m_activeWatcher) {
+        m_activeWatcher->waitForFinished();
     }
-    m_chart->removeAxis(m_xAxis);
-    m_chart->removeAxis(m_yAxis);
     //对象的管理交给Qt，不必手动管理
     //移动到线程中的对象还是得手动析构
     delete m_importer;
     delete m_exporter;
+    delete m_storage;
 }
 
 void ChartManager::Private::buildChart()
@@ -61,7 +57,7 @@ void ChartManager::Private::buildChart()
     m_color = WINDOW_COLOR;         //默认为白色
 
     for (int i = 0; i < m_count; ++i) {
-        QLineSeries* targetSeries = new QLineSeries(this);  //内存的管理交给Qt
+        QLineSeries* targetSeries = new QLineSeries(m_chart);  //内存的管理交给Qt
         targetSeries->setName(QString("CH%1目标值").arg(i+1));
         targetSeries->setColor(targetColors[i]);
         QPen pen = targetSeries->pen();
@@ -71,7 +67,7 @@ void ChartManager::Private::buildChart()
         m_chart->addSeries(targetSeries);
         targetSeries->setVisible(false);
 
-        QLineSeries* actualSeries = new QLineSeries(this);
+        QLineSeries* actualSeries = new QLineSeries(m_chart);
         actualSeries->setName(QString("CH%1实际值").arg(i+1));
         actualSeries->setColor(actualColors[i]);
         pen = actualSeries->pen();
@@ -82,8 +78,8 @@ void ChartManager::Private::buildChart()
         actualSeries->setVisible(false);
     }
 
-    m_xAxis = new QValueAxis(this);
-    m_yAxis = new QValueAxis(this);
+    m_xAxis = new QValueAxis(m_chart);
+    m_yAxis = new QValueAxis(m_chart);
     m_xAxis->setTitleText("时间 (s)");
     m_xAxis->setTickCount(11);
     m_xAxis->setMinorTickCount(1);
@@ -114,7 +110,7 @@ void ChartManager::Private::buildChart()
 void ChartManager::Private::buildData()
 {
     data_thread = new QThread(this);
-    m_storage = new DataStorage(DEFUALT_CHANNEL_POINTS, m_count,this);
+    m_storage = new DataStorage(DEFUALT_CHANNEL_POINTS, m_count,nullptr);
     m_importer = new DataImporter(m_storage);
     m_exporter = new DataExporter(m_storage);
     //移入线程的对象不能有parent
@@ -153,8 +149,6 @@ void ChartManager::Private::start()
 {
     data_thread->start();
     m_timer->start();
-
-    //m_statsTimer->start();
 }
 
 void ChartManager::Private::stop()
@@ -554,10 +548,12 @@ void ChartManager::Private::processTasksParallel(const QList<SeriesTask>& tasks,
 
     // 使用 QFutureWatcher 异步等待完成
     QFutureWatcher<SeriesResult>* watcher = new QFutureWatcher<SeriesResult>(this);
+    m_activeWatcher = watcher; // 存储
     connect(watcher, &QFutureWatcher<SeriesResult>::finished, this, [this, watcher, isUpdateAll]() {
         QList<SeriesResult> results = watcher->future().results();
         onAllResultsReady(results);
         watcher->deleteLater();
+        m_activeWatcher = nullptr;
         if (isUpdateAll) {
             // 如果是 updateAll，还需要恢复定时器等操作
             finishUpdateAll();

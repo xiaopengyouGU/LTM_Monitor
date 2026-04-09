@@ -21,9 +21,9 @@
 
 本项目定义了一套轻量级的**通讯协议**，用于上位机与下位机（如单片机）之间的数据交换。协议设计简洁，易于移植到各种嵌入式平台。
 
-协议源码位于 **`examples/protocol/`** 目录，采用纯 C 语言实现，无额外依赖，可直接集成到 ARM Cortex-M 等平台。
+协议源码位于 **`example/protocol/`** 目录，采用纯 C 语言实现，无额外依赖，可直接集成到 ARM Cortex-M 等平台。
 
-同时，我们在 **`examples/STM32/`** 目录下提供了一个完整的 **STM32F103C8T6 开发板移植示例**，包含：
+同时，我们在 **`example/stm32f103/`** 目录下提供了一个完整的 **STM32F103 开发板移植示例**，包含：
 - 串口收发驱动适配
 - 协议数据帧的封装与解析
 - 与上位机联调的演示代码
@@ -188,8 +188,8 @@ cmake --install . --prefix D:/LTM_Project
 
 | 目录 | 内容 |
 |------|------|
-| `examples/protocol`      | 通讯协议 C 源码（平台无关） |
-| `examples/STM32`     | STM32F103 移植示例工程 |
+| `example/protocol`      | 通讯协议 C 源码（平台无关） |
+| `example/stm32f103`     | STM32F103 移植示例工程 |
 | `src/modules/chart`     | 图表动态库（提供实时曲线功能）   |
 | `src/modules/serial`    | 串口通讯动态库（封装 QtSerialPort）|
 | `src/modules/record`    | 数据记录动态库（数据库、日志系统）|

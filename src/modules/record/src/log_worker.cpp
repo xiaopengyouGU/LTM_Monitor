@@ -83,6 +83,7 @@ LogWorker::LogWorker(QObject *parent) : QObject(parent)
 
 LogWorker::~LogWorker()
 {
+    spdlog::shutdown();   // 关闭异步线程,这是非常关键的一步
     spdlog::drop_all();   // 清理所有的logger
 }
 
