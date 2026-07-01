@@ -24,17 +24,16 @@ public:
 
 private:
     // 常量定义
-    static constexpr uint32_t FRAME_HEADER = 0xABCD1234;    // 帧头
-    static constexpr uint32_t FRAME_TAILER = 0x5678EFDC;    // 帧尾
-    static constexpr uint16_t RB_SIZE = 256;                // 环形缓冲区大小
-    static constexpr uint16_t MAX_DATA_SIZE = 80;           // 支持的最大数据长度
+    static constexpr uint32_t FRAME_HEADER = 0xA5B9;    // 帧头， 小端存储（2字节）：B9 A5，极其冷门
+    static constexpr uint16_t RB_SIZE = 256;            // 环形缓冲区大小
+    static constexpr uint16_t MAX_DATA_SIZE = 128;      // 支持的最大数据长度
 
     // 帧头结构（1字节对齐）
     #pragma pack(push, 1)
     struct ProtocolHeader {
-        uint32_t header;
+        uint16_t header;
         uint8_t data_type;
-        uint16_t data_len;
+        uint8_t data_len;
     };
     #pragma pack(pop)
 
@@ -55,8 +54,6 @@ private:
     // 私有辅助函数
     static uint16_t crc16_check(const uint8_t* data, uint16_t len);
     static const char* data_type_to_str(uint8_t type);
-    bool parse_frame(const uint8_t* buffer, uint16_t recv_len,
-                     uint8_t* data_type, QByteArray &data);
     void rb_init();
     uint16_t rb_available() const;
     uint16_t rb_space() const;

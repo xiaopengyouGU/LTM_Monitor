@@ -1,7 +1,7 @@
 #include "serial_manager.h"
 #include "serial_worker.h"
 #include "serial_protocol.h"
-
+#include "serial_def.h"
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QTimer>
@@ -13,7 +13,8 @@ SerialWorker::SerialWorker(QObject *parent):QObject(parent)
     m_timer = new QTimer(this);            //端口数检测定时器，1500ms刷新一次
     m_lastPorts = {};
     //初始化协议解析对象
-    protocol->init();                      //
+    protocol->init();
+    m_type = 0;                            //默认采用 LTM协议
     //定时器初始化
     m_timer->setTimerType(Qt::CoarseTimer);
     m_timer->setInterval(1500);
@@ -60,6 +61,11 @@ void SerialWorker::close()
     }
 }
 
+void SerialWorker::setProtocol(uint8_t type)                         //设置通讯协议
+{
+    m_type = type;
+}
+
 void SerialWorker::start()                                            //启动定时器
 {
     m_timer->start();
@@ -75,6 +81,10 @@ void SerialWorker::do_readyRead()
     uint8_t type;
     QByteArray rawData = comPort->readAll();   //获取串口缓冲区数据
     QByteArray data;                           //处理完后的数据
+    if(m_type){                                //当前通讯协议为：普通串口
+        emit serialDataUpdated(Data_CMD_Text, rawData); //可认为接收的均Text数据，
+        return;
+    }
 
     protocol->receive(rawData);                //将接收的数据放入环形缓冲区
     //循环解析数据帧
@@ -106,6 +116,10 @@ void SerialWorker::send(uint8_t type, const QByteArray& data)    //发送数据�
 {
     if(comPort->isOpen())
     {
+        if(m_type){                                             //采用普通串口协议
+            comPort->write(data);                               //直接发送！
+            return;
+        }
         protocol->package(type, data);                          //将数据打包
         comPort->write(protocol->getRawData());                 //发送打包完后的原始数据
     }

@@ -19,6 +19,7 @@ public:
     SerialConfig() {};                  //构造函数
 };                                      //串口配置结构体
 
+//支持 LTM协议 和 普通串口
 //串口管理器，负责进行串口相关操作，唯一与用户交互的模块
 class SERIAL_EXPORT SerialManager:public QObject{
     Q_OBJECT
@@ -31,6 +32,7 @@ public:
     void open(SerialConfig config);                     //打开串口
     void close();                                       //关闭串口
     void send(uint8_t type, const QByteArray& data);    //发送数据接口
+    void setProtocol(uint8_t type);                     //设置通讯协议：支持LTM协议和普通串口
 signals:
     //发送给用户的信号
     void serialDataUpdated(uint8_t data_type, const QByteArray& data);  //数据更新

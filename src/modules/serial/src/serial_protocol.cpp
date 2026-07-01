@@ -3,14 +3,37 @@
 
 // 数据类型名称映射表
 static const char* data_type_names[Data_Unknown] = {
-    "Data_Target", "Data_Position", "Data_Velocity", "Data_Current",
-    "Data_Motor_Tempe", "Data_Driver_Tempe", "Data_CMD_Start", "Data_CMD_Reset",
-    "Data_CMD_Set_PID", "Data_CMD_Set_Period", "Data_CMD_Stop", "Data_CMD_Jog",
-    "Data_CMD_Forw", "Data_CMD_Reve", "Data_CMD_Text", "Data_Ctrl_Pos",
-    "Data_Ctrl_Vel", "Data_Ctrl_Tor", "Data_Ctrl_Open_Pos", "Data_Ctrl_Open_Vel",
-    "Data_Ctrl_Sensorless_Vel", "Data_Ctrl_Stop_Quick", "Data_Res_Start",
-    "Data_Res_Stop", "Data_Channel1", "Data_Channel2", "Data_Channel3",
-    "Data_Channel4", "Data_Channel5"
+    "Data_Target",
+    "Data_Position",
+    "Data_Velocity",
+    "Data_Current",
+    "Data_Motor_Tempe",
+    "Data_Driver_Tempe",
+    "Data_CMD_Start",
+    "Data_CMD_Reset",
+    "Data_CMD_Set_PID",
+    "Data_CMD_Set_Period",
+    "Data_CMD_Stop",
+    "Data_CMD_Jog",
+    "Data_CMD_Forw",
+    "Data_CMD_Reve",
+    "Data_CMD_Text",              //文字指令，仅限控制台收发
+    "Data_Ctrl_Pos",
+    "Data_Ctrl_Vel",
+    "Data_Ctrl_Tor",
+    "Data_Ctrl_Open_Pos",
+    "Data_Ctrl_Open_Vel",
+    "Data_Ctrl_Sensorless_Vel",
+    "Data_Ctrl_Stop_Quick",
+    "Data_Res_Start",
+    "Data_Res_Stop",
+    "Data_Channel1",
+    "Data_Channel2",
+    "Data_Channel3",
+    "Data_Channel4",
+    "Data_Channel5",
+	"Data_Channel_ALL",
+	"Data_User_Defined",			/* 用户自定义通讯内容 */
 };
 
 // 构造函数
@@ -29,10 +52,7 @@ void SerialProtocol::init() {
 // 协议解析
 bool SerialProtocol::process(uint8_t &data_type, QByteArray& data) 
 {
-    uint8_t tmp_type;
-    bool res = rb_parse_frame(&tmp_type, data);
-    data_type = tmp_type;
-    return res;
+    return rb_parse_frame(&data_type, data);
 }
 
 // 将待发送数据打包成RawData格式，用于串口发送
@@ -47,16 +67,13 @@ void SerialProtocol::package(uint8_t data_type, const QByteArray& data) {
 
     uint8_t* data_ptr = send_buf + sizeof(hdr);
     uint8_t* crc_ptr = data_ptr + data_len;
-    uint8_t* tail_ptr = crc_ptr + 2;
 
     std::memcpy(send_buf, &hdr, sizeof(hdr));
     std::memcpy(data_ptr, (uint8_t*)data.constData(), data_len);
 
     uint16_t crc = crc16_check(send_buf, data_len + sizeof(hdr));
-    uint32_t tail = FRAME_TAILER;
     std::memcpy(crc_ptr, &crc, 2);
-    std::memcpy(tail_ptr, &tail, 4);
-    buf_len = sizeof(hdr) + data_len + 2 + 4;
+    buf_len = sizeof(hdr) + data_len + 2;
     //将缓冲区数据转换成原始数据
     rawData = QByteArray((char *)send_buf, buf_len);
 }
@@ -147,9 +164,11 @@ bool SerialProtocol::rb_consume(uint16_t len) {
 
 // 从环形缓冲区解析一帧
 bool SerialProtocol::rb_parse_frame(uint8_t *data_type, QByteArray& data) {
+    const uint8_t hdr_size = sizeof(ProtocolHeader);
+
     while (rb_available() >= 4) {
-        uint32_t header;
-        if (!rb_peek(0, (uint8_t*)&header, 4)) break;
+        uint16_t header;
+        if (!rb_peek(0, (uint8_t*)&header, 2)) break;   // 检查帧头
         if (header != FRAME_HEADER) {
             rb_consume(1);
             continue;
@@ -157,55 +176,39 @@ bool SerialProtocol::rb_parse_frame(uint8_t *data_type, QByteArray& data) {
         if (rb_available() < sizeof(ProtocolHeader)) break;
         ProtocolHeader hdr;
         if (!rb_peek(0, (uint8_t*)&hdr, sizeof(hdr))) break;
-        if (hdr.data_len > MAX_DATA_SIZE) {         //最大数据长度：80
+
+        uint8_t hdr_data_len = hdr.data_len;
+        if (hdr_data_len > MAX_DATA_SIZE) {           // 最大数据长度：128
             rb_consume(1);
             continue;
         }
-        uint16_t total_len = sizeof(ProtocolHeader) + hdr.data_len + 2 + 4;
+
+        // 数据帧长度
+        uint16_t total_len = sizeof(ProtocolHeader) + hdr_data_len + 2;
         if (total_len > RB_SIZE) {
             rb_consume(1);
             continue;
         }
         if (rb_available() < total_len) break;
-        uint8_t frame[128];
-        if (!rb_peek(0, frame, total_len)) break;
-        if (parse_frame(frame, total_len, data_type, data)) {
-            rb_consume(total_len);
-            return true;
-        } else {
-            rb_consume(1);
-            continue;
-        }
+        // 读取完整数据帧到缓冲区中
+        uint8_t buffer[MAX_DATA_SIZE + 6];
+        uint16_t crc_recv;
+		if(!rb_peek(0, buffer, total_len)) break;
+		std::memcpy(&crc_recv, buffer + hdr_size + hdr_data_len, 2);
+		
+		/* 开始 CRC 校验 */
+		uint16_t calc_crc = crc16_check(buffer, hdr_size + hdr_data_len);
+		if(calc_crc != crc_recv) {
+			rb_consume(1);  		    // 丢弃一个字节，尝试重新同步 
+			continue;           		// 继续while循环，寻找下一个帧头 
+		}
+		
+		// 数据输出
+		*data_type = hdr.data_type;
+        data = QByteArray((const char*)(buffer + hdr_size), hdr_data_len);
+		rb_consume(total_len);  	    // 消费整帧 
+		
+		return true;
     }
     return false;
-}
-
-// 完整帧解析（校验帧头、帧尾、CRC）
-bool SerialProtocol::parse_frame(const uint8_t* buffer, uint16_t recv_len,
-                                 uint8_t* data_type, QByteArray& data) {
-    if (recv_len < 13) return false;
-    ProtocolHeader hdr;
-    std::memcpy(&hdr, buffer, sizeof(hdr));
-    if (hdr.header != FRAME_HEADER) return false;           //检测帧头
-    uint16_t data_len = hdr.data_len;
-    //支持的最大数据长度为 80 byte                           
-    if (data_len > MAX_DATA_SIZE) return false;                        
-    uint16_t expected_len = sizeof(ProtocolHeader) + data_len + 2 + 4;  //期待的长度
-    if (recv_len < expected_len) return false;
-    //找到变量指针位置
-    const uint8_t* data_ptr = buffer + sizeof(ProtocolHeader);
-    const uint8_t* crc_ptr = data_ptr + data_len;
-    const uint8_t* tail_ptr = crc_ptr + 2;
-    uint32_t tail;
-    std::memcpy(&tail, tail_ptr, 4);
-    if (tail != FRAME_TAILER) return false;
-    //开始CRC校验
-    uint16_t calc_crc = crc16_check(buffer, sizeof(ProtocolHeader) + data_len);
-    uint16_t recv_crc;
-    std::memcpy(&recv_crc, crc_ptr, 2);
-    if (recv_crc != calc_crc) return false;
-    //拷贝解析完毕后的数据
-    data = QByteArray((const char*)data_ptr, data_len);
-    *data_type = hdr.data_type;
-    return true;
 }

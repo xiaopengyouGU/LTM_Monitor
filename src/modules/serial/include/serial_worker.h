@@ -30,6 +30,7 @@ public slots:
     void open(SerialConfig config);
     void close();
     void send(uint8_t type, const QByteArray& data);
+    void setProtocol(uint8_t type);                         //设置通讯协议
     void start();                                           //启动定时器
     void stop();                                            //停止定时器
 private slots:
@@ -40,7 +41,8 @@ private:
     QStringList     m_lastPorts;                       //记录的端口信息
     QSerialPort     *comPort;                          //串口对象
     SerialProtocol  *protocol;                         //协议解析对象
-    QTimer          *m_timer;                          //定时器，1500ms查询一次端口数量信息         
+    QTimer          *m_timer;                          //定时器，1500ms查询一次端口数量信息
+    uint8_t         m_type;                            //支持的串口协议（LTM协议：0），1：普通串口
 };
 
 #endif

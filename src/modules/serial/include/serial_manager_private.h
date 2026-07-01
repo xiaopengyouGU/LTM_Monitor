@@ -22,10 +22,12 @@ public:
     void open(SerialConfig config);                     //打开串口
     void close();                                       //关闭串口
     void send(uint8_t type, const QByteArray& data);    //发送数据接口
+    void setProtocol(uint8_t type);                     //设置通讯协议：支持LTM协议和普通串口
 signals:                                                //私有信号
     void openSerial(SerialConfig config);
     void closeSerial();
     void sendData(uint8_t type, const QByteArray& data);
+    void protocolSet(uint8_t type);
 private slots:
     void do_serialDataUpdated(uint8_t data_type, const QByteArray& data);  //数据更新
     void do_serialPortNumChanged(const QStringList& portNum);              //端口数量变化  

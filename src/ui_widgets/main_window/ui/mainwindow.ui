@@ -6,21 +6,26 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1080</width>
-    <height>750</height>
+    <width>1120</width>
+    <height>870</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>1080</width>
-    <height>750</height>
+    <width>1120</width>
+    <height>870</height>
    </size>
+  </property>
+  <property name="font">
+   <font>
+    <pointsize>11</pointsize>
+   </font>
   </property>
   <property name="windowTitle">
    <string>LTM_Monitor</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="../img.qrc">
+   <iconset resource="../../chart_dialog/img.qrc">
     <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -31,6 +36,12 @@
     </size>
    </property>
    <layout class="QGridLayout" name="gridLayout_5">
+    <property name="topMargin">
+     <number>3</number>
+    </property>
+    <property name="bottomMargin">
+     <number>3</number>
+    </property>
     <item row="0" column="1" rowspan="5">
      <widget class="QSplitter" name="splitter">
       <property name="minimumSize">
@@ -46,7 +57,7 @@
        <property name="minimumSize">
         <size>
          <width>700</width>
-         <height>500</height>
+         <height>520</height>
         </size>
        </property>
       </widget>
@@ -54,17 +65,67 @@
        <property name="minimumSize">
         <size>
          <width>0</width>
-         <height>130</height>
+         <height>175</height>
         </size>
        </property>
        <property name="title">
         <string>控制台</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_4">
-        <item row="4" column="1">
+        <item row="0" column="2">
+         <widget class="QPushButton" name="btnClearRev">
+          <property name="text">
+           <string>清除接收</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
          <widget class="QLineEdit" name="editCMD"/>
         </item>
+        <item row="5" column="2">
+         <widget class="QPushButton" name="btnSend">
+          <property name="text">
+           <string>发送指令</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="2">
+         <widget class="QPushButton" name="btnHelp">
+          <property name="text">
+           <string>帮助指令</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" rowspan="5" colspan="2">
+         <widget class="QPlainTextEdit" name="plainTextEdit">
+          <property name="font">
+           <font>
+            <pointsize>40</pointsize>
+           </font>
+          </property>
+          <property name="plainText">
+           <string>Hello LTM_Monitor!!!</string>
+          </property>
+         </widget>
+        </item>
         <item row="3" column="2">
+         <widget class="QPushButton" name="btnShowMotor">
+          <property name="text">
+           <string>电机配置</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label_11">
+          <property name="text">
+           <string>指令：</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="2">
          <spacer name="verticalSpacer_2">
           <property name="orientation">
            <enum>Qt::Orientation::Vertical</enum>
@@ -78,52 +139,9 @@
          </spacer>
         </item>
         <item row="2" column="2">
-         <widget class="QPushButton" name="btnShowMotor">
+         <widget class="QPushButton" name="btnSaveCmd">
           <property name="text">
-           <string>电机配置</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="2">
-         <widget class="QPushButton" name="btnHelp">
-          <property name="text">
-           <string>帮助指令</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0" rowspan="4" colspan="2">
-         <widget class="QPlainTextEdit" name="plainTextEdit">
-          <property name="font">
-           <font>
-            <pointsize>40</pointsize>
-           </font>
-          </property>
-          <property name="plainText">
-           <string>Hello World!!!</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="2">
-         <widget class="QPushButton" name="btnSend">
-          <property name="text">
-           <string>发送指令</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <widget class="QPushButton" name="btnClearRev">
-          <property name="text">
-           <string>清除接收</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0">
-         <widget class="QLabel" name="label_11">
-          <property name="text">
-           <string>指令：</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignmentFlag::AlignCenter</set>
+           <string>保存控制台</string>
           </property>
          </widget>
         </item>
@@ -147,7 +165,7 @@
       </property>
       <property name="maximumSize">
        <size>
-        <width>170</width>
+        <width>220</width>
         <height>600</height>
        </size>
       </property>
@@ -217,7 +235,7 @@
           <string>图表显示</string>
          </property>
          <property name="icon">
-          <iconset resource="../img.qrc">
+          <iconset resource="../../chart_dialog/img.qrc">
            <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
          </property>
         </widget>
@@ -241,14 +259,22 @@
       </property>
       <property name="maximumSize">
        <size>
-        <width>160</width>
-        <height>160</height>
+        <width>220</width>
+        <height>350</height>
        </size>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>11</pointsize>
+       </font>
       </property>
       <property name="title">
        <string>串口配置</string>
       </property>
       <layout class="QGridLayout" name="gridLayout" columnstretch="1,2">
+       <property name="topMargin">
+        <number>2</number>
+       </property>
        <item row="1" column="0">
         <widget class="QLabel" name="label_2">
          <property name="text">
@@ -272,6 +298,12 @@
        </item>
        <item row="1" column="1">
         <widget class="QComboBox" name="comboBaud">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <property name="currentIndex">
           <number>5</number>
          </property>
@@ -319,6 +351,12 @@
        </item>
        <item row="4" column="1">
         <widget class="QComboBox" name="comboStop">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <item>
           <property name="text">
            <string>1</string>
@@ -337,10 +375,29 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QComboBox" name="comboPort"/>
+        <widget class="QComboBox" name="comboPort">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
        </item>
        <item row="5" column="1">
         <widget class="QPushButton" name="btnSerial">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>25</height>
+          </size>
+         </property>
          <property name="text">
           <string>打开串口</string>
          </property>
@@ -362,6 +419,12 @@
        </item>
        <item row="2" column="1">
         <widget class="QComboBox" name="comboCheck">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <item>
           <property name="text">
            <string>None</string>
@@ -388,6 +451,12 @@
        </item>
        <item row="3" column="1">
         <widget class="QComboBox" name="comboData">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <item>
           <property name="text">
            <string>8</string>
@@ -431,31 +500,31 @@
       <property name="minimumSize">
        <size>
         <width>200</width>
-        <height>300</height>
+        <height>380</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
-        <width>170</width>
-        <height>260</height>
+        <width>220</width>
+        <height>400</height>
        </size>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="page">
        <property name="geometry">
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>200</width>
-         <height>252</height>
+         <width>220</width>
+         <height>302</height>
         </rect>
        </property>
        <attribute name="label">
         <string>PID配置</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1">
+       <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1" columnminimumwidth="1,1">
         <item row="7" column="1">
          <widget class="QLineEdit" name="editTarget">
           <property name="text">
@@ -605,8 +674,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>200</width>
-         <height>252</height>
+         <width>220</width>
+         <height>302</height>
         </rect>
        </property>
        <attribute name="label">
@@ -681,7 +750,7 @@
         <item row="2" column="0">
          <widget class="QLabel" name="label_14">
           <property name="text">
-           <string>位置（degree）</string>
+           <string>位置（°）</string>
           </property>
          </widget>
         </item>
@@ -695,7 +764,7 @@
         <item row="3" column="0">
          <widget class="QLabel" name="label_15">
           <property name="text">
-           <string>速度（rpm）</string>
+           <string>速度（RPM）</string>
           </property>
          </widget>
         </item>
@@ -709,7 +778,7 @@
         <item row="4" column="0">
          <widget class="QLabel" name="label_16">
           <property name="text">
-           <string>电流（mA）</string>
+           <string>转矩（%）</string>
           </property>
          </widget>
         </item>
@@ -749,9 +818,9 @@
          </widget>
         </item>
         <item row="7" column="0">
-         <widget class="QPushButton" name="btnJog">
+         <widget class="QPushButton" name="btnStartMotor">
           <property name="text">
-           <string>点动</string>
+           <string>启动</string>
           </property>
          </widget>
         </item>
@@ -759,6 +828,138 @@
          <widget class="QPushButton" name="btnStopMotor">
           <property name="text">
            <string>停机</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="page_3">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>220</width>
+         <height>302</height>
+        </rect>
+       </property>
+       <attribute name="label">
+        <string>串口调试</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_7" columnstretch="1,1">
+        <item row="3" column="0">
+         <widget class="QCheckBox" name="chkSendNewL">
+          <property name="statusTip">
+           <string>勾选此项，发送指令时将自动添加回车换行！</string>
+          </property>
+          <property name="text">
+           <string>发送新行</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QPushButton" name="btnSendFile">
+          <property name="text">
+           <string>发送文件</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>通讯协议</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QCheckBox" name="chkSendPeriod">
+          <property name="text">
+           <string>定时发送</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="comboProt">
+          <item>
+           <property name="text">
+            <string>LTM协议</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>普通串口</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string/>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_18">
+          <property name="text">
+           <string>发送周期</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QSpinBox" name="spinSendPeriod">
+          <property name="suffix">
+           <string> ms</string>
+          </property>
+          <property name="maximum">
+           <number>20000</number>
+          </property>
+          <property name="singleStep">
+           <number>10</number>
+          </property>
+          <property name="value">
+           <number>1000</number>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QCheckBox" name="chkHexSend">
+          <property name="text">
+           <string>16进制发送</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QPushButton" name="btnOpenFile">
+          <property name="text">
+           <string>打开文件</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QCheckBox" name="chkHexShow">
+          <property name="text">
+           <string>16进制显示</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QPushButton" name="btnStopRecv">
+          <property name="text">
+           <string>暂停接收</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QPushButton" name="btnClearRecv">
+          <property name="text">
+           <string>清除接收</string>
           </property>
          </widget>
         </item>
@@ -773,8 +974,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1080</width>
-     <height>17</height>
+     <width>1120</width>
+     <height>19</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -809,6 +1010,7 @@
     <property name="title">
      <string>帮助</string>
     </property>
+    <addaction name="actUseIntro"/>
    </widget>
    <widget class="QMenu" name="menu_2">
     <property name="title">
@@ -826,7 +1028,7 @@
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actImportCSV">
    <property name="icon">
-    <iconset>
+    <iconset resource="../../chart_dialog/img.qrc">
      <normaloff>:/icon/images/124.bmp</normaloff>:/icon/images/124.bmp</iconset>
    </property>
    <property name="text">
@@ -841,7 +1043,7 @@
   </action>
   <action name="actImportDB">
    <property name="icon">
-    <iconset>
+    <iconset resource="../../chart_dialog/img.qrc">
      <normaloff>:/icon/images/open3.bmp</normaloff>:/icon/images/open3.bmp</iconset>
    </property>
    <property name="text">
@@ -871,6 +1073,21 @@
     <enum>QAction::MenuRole::NoRole</enum>
    </property>
   </action>
+  <action name="actUseIntro">
+   <property name="icon">
+    <iconset resource="../../chart_dialog/img.qrc">
+     <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
+   </property>
+   <property name="text">
+    <string>使用说明</string>
+   </property>
+   <property name="toolTip">
+    <string>LTM_Monitor的使用说明</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::NoRole</enum>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -880,7 +1097,7 @@
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../img.qrc"/>
+  <include location="../../chart_dialog/img.qrc"/>
  </resources>
  <connections/>
 </ui>

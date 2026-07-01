@@ -21,6 +21,7 @@ SerialManager::Private::Private(SerialManager * parent):QObject(parent), m_manag
     connect(this, &Private::openSerial,  m_worker, &SerialWorker::open);
     connect(this, &Private::closeSerial, m_worker, &SerialWorker::close);
     connect(this, &Private::sendData,    m_worker, &SerialWorker::send);
+    connect(this, &Private::protocolSet, m_worker, &SerialWorker::setProtocol);
     //线程启动后，再启动worker的定时器
     connect(data_thread, &QThread::started, m_worker, &SerialWorker::start);
 }
@@ -59,6 +60,11 @@ void SerialManager::Private::send(uint8_t type, const QByteArray& data)
     emit sendData(type, data);
 }
 
+void SerialManager::Private::setProtocol(uint8_t type)
+{
+    emit protocolSet(type);
+}
+
 //信号中转
 void SerialManager::Private::do_serialDataUpdated(uint8_t data_type, const QByteArray& data)  //数据更新
 {
@@ -90,3 +96,4 @@ void SerialManager::stop()                       { pimpl->stop(); }
 void SerialManager::open(SerialConfig config)    { pimpl->open(config); }
 void SerialManager::close()                      { pimpl->close(); }
 void SerialManager::send(uint8_t type, const QByteArray& data)    { pimpl->send(type, data);}
+void SerialManager::setProtocol(uint8_t type)    { pimpl->setProtocol(type);}

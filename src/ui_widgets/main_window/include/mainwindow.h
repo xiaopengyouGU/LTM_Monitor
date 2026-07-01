@@ -17,7 +17,6 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-
 //该结构体用于数据库数据写入
 typedef struct{
     qint64 timestamp;
@@ -44,6 +43,7 @@ class LogAnalysis;
 class StatusBar;
 class ChartDialog;
 class WindowDataProcessor;
+class QTimer;
 
 class MainWindow : public QMainWindow
 {
@@ -71,8 +71,10 @@ private slots:
     void do_serialOpened(bool success, const QString& msg);                //串口打开信号
     void do_serialClose();                                                 //串口关闭信号
     //串口数据处理相关接口
-    void do_textOrCMDReceived(uint8_t type, const QString& str);           //读取指令或文本，str为状态字符串 
+    void do_textOrCMDReceived(uint8_t type, const QString& str, const QByteArray& data); //读取指令或文本，str为状态字符串
     void do_pidActualChanged(int ch, const QString& actual);
+    void do_pidActualChanged(const QStringList& actNum);
+    void do_timer_timeout();                        //定时器超时回调函数
 
     void on_btnClearRev_clicked();
     void on_btnSend_clicked();                      //发送指令
@@ -89,10 +91,30 @@ private slots:
     void on_btnClearShow_clicked();                 //清空显示,一键清屏
     void on_btnHelp_clicked();                      //输出帮助信息
     void on_comboCh_currentIndexChanged(int index); //当前通道切换
+    void on_btnClearRecv_clicked();                 //清空控制台
+    void on_btnStopRecv_clicked();                  //暂停控制接收
+    //串口调试界面组件
+    void on_comboProt_currentIndexChanged(int index); //更换通讯协议
+    void on_chkSendPeriod_stateChanged(int arg1);     //周期发送数据
+    void on_chkSendNewL_stateChanged(int arg1);       //发送新行
+    void on_chkHexShow_stateChanged(int arg1);        //16进制显示
+    void on_chkHexSend_stateChanged(int arg1);        //16进制发送
+    void on_editCMD_textChanged(const QString &arg1); //命令修改
+    void on_btnSaveCmd_clicked();                     //保存控制台
+    void on_btnOpenFile_clicked();                    //打开文件
+    void on_btnSendFile_clicked();                    //发送文件
 
     //菜单栏对应的槽函数
     void on_actImportDB_triggered();                //打开数据库
     void on_actOpenLog_triggered();                 //打开日志分析器
+    void on_actUseIntro_triggered();
+
+private:
+    QString fromHexDisplay(const QString &hexDisplay);//原始值转换到16进制
+    QString toHexDisplay(const QString &rawText);     //16进制到原始值
+    void appendText(const QString &text);             //追加文本
+    void updateDisplay();                             //更新显示
+
 private:
     Ui::MainWindow *ui;
    
@@ -108,5 +130,15 @@ private:
     QThread         *process_thread;    //数据处理线程
     WindowDataProcessor *processor;     //窗口数据处理器
     QList<pid_data_t> pid_datas;        //保存了5个通道的目标值
+    //与串口调试界面相关的变量
+    QTimer          *m_timer;           //定时器，用于定时发送数据
+    bool            m_recv;             //接收标志
+    bool            m_newLine;          //是否发送新行（加换行符）
+    bool            m_hexSendMode;      //当前是否处于16进制发送模式
+    bool            m_hexShowMode;      //当前是否处于16进制接收模式
+    QByteArray      m_rawReceivedData;  //保存所有接收到的原始数据（二进制）
+    QByteArray      m_fileData;         //存储打开的文件数据
+    QString         m_rawText;          //存储原始输入文本（用户真正输入的内容）
+    QString         m_strPeriod;        //周期发送的指令
 };
 #endif // MAINWINDOW_H

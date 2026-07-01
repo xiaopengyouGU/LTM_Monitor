@@ -14,13 +14,13 @@ StatusBar::StatusBar(QWidget *parent)
     // 作者标签
     labAuthor = new QLabel(this);
     labAuthor->setMinimumWidth(100);
-    labAuthor->setText("  Lvtou (中南大学)");
+    labAuthor->setText("  Lvtou (宁波)");
     layout->addWidget(labAuthor);
     addSeparator(layout);
 
     // 网址标签
     labWebside = new QLabel(this);
-    labWebside->setMinimumWidth(300);
+    labWebside->setMinimumWidth(350);
     labWebside->setText(" https://gitee.com/xiaopengyouGU/LTM_Monitor");
     layout->addWidget(labWebside, 1);
     addSeparator(layout);
@@ -28,7 +28,7 @@ StatusBar::StatusBar(QWidget *parent)
     // 信息标签
     labInfo = new QLabel(this);
     labInfo->setMinimumWidth(300);
-    labInfo->setText("欢迎使用: LTM_Monitor V0.1.1");
+    labInfo->setText("欢迎使用: LTM_Monitor V0.2.0");
     layout->addWidget(labInfo, 3);
     addSeparator(layout);
 
