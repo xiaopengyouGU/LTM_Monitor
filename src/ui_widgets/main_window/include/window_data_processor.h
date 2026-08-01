@@ -27,8 +27,8 @@ private:
     QString data2Str(float value);                      //将数据转换为String,动态显示小数位
 
     static constexpr int CURVES_SIZE = 5;               //支持的曲线数量
-    static constexpr int MIN_PERIOD = 47;               //至少间隔 47ms 发送一次数据到 UI主线程
-    QRegularExpression trailingZeros;      //正则表达式
+    static constexpr int MIN_PERIOD = 39;               //至少间隔 39ms 发送一次数据到 UI主线程
+    QRegularExpression trailingZeros;                   //正则表达式
     QRegularExpression trailingDot;
 private:
     ChartManager    *m_manager;

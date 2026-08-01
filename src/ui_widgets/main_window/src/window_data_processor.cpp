@@ -24,13 +24,16 @@ void WindowDataProcessor::setPidNum(QList<pid_data_t> *num)                   //
     m_pidNum = num;
 }
 
-QString WindowDataProcessor::data2Str(float value)         //将数据转换为String,动态显示小数位
+QString WindowDataProcessor::data2Str(float value)      //将数据转换为String,动态显示小数位
 {
-    int pos = 3;                                        //动态限制小数点后位数
-    if(qAbs(value) < 1000) pos = 2;
-    if(qAbs(value) < 6000) pos = 1;
-    QString str = QString::number(value, 'f', pos);     // 先固定3位小数,最多显示小数点后三位
-    str.remove(trailingZeros).remove(trailingDot);      // 去除末尾零及可能的小数点
+    int pos = 3;
+    float abs_val = qAbs(value);                        //动态显示小数位
+    if (abs_val > 10000)     pos = 0;                   //上万，不显示小数
+    else if (abs_val > 1000) pos = 1;                   //上千，显示1位
+    else if (abs_val > 30)   pos = 2;                   //几十到几百，显示2位
+    else pos = 3;                                       //小于30，显示3位
+    QString str = QString::number(value, 'f', pos);     //先固定3位小数,最多显示小数点后三位
+    str.remove(trailingZeros).remove(trailingDot);      //去除末尾零及可能的小数点
     return str;
 }
 
