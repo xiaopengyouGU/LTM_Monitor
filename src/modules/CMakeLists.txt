@@ -2,3 +2,4 @@
 add_subdirectory(chart)
 add_subdirectory(serial)
 add_subdirectory(record)
+add_subdirectory(canfd)
