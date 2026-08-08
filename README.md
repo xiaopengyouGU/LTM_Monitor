@@ -18,6 +18,12 @@
     <p><em>主界面 - 串口通讯、实时曲线显示、数据记录</em></p>
 </div>
 
+<div align="center">
+    <img src="documents/images/界面3.png" alt="CAN-FD 界面">
+    <p><em>CAN-FD 界面 - CAN/CAN-FD通讯、数据记录、定时发送</em></p>
+</div>
+
+
 > 以上截图来自实际运行环境，界面可能因版本更新略有差异。
 
 ---
@@ -36,7 +42,7 @@
 示例例程运行结果如下图所示：
 
 <div align="center">
-    <img src="documents/images/界面3.png" alt="示例例程">
+    <img src="documents/images/界面4.png" alt="示例例程">
     <p><em>示例例程结果 - 串口通讯、实时曲线显示、数据记录</em></p>
 </div>
 
