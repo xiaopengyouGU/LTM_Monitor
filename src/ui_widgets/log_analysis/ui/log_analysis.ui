@@ -10,11 +10,16 @@
     <height>458</height>
    </rect>
   </property>
+  <property name="font">
+   <font>
+    <pointsize>11</pointsize>
+   </font>
+  </property>
   <property name="windowTitle">
    <string>日志分析器</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="img.qrc">
+   <iconset resource="../../chart_dialog/img.qrc">
     <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
   </property>
   <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1">
@@ -166,7 +171,7 @@
   </layout>
  </widget>
  <resources>
-  <include location="img.qrc"/>
+  <include location="../../chart_dialog/img.qrc"/>
  </resources>
  <connections/>
 </ui>
