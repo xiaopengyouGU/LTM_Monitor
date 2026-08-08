@@ -4,7 +4,7 @@
 
 ## 安装包
 
-安装包 **LTM_Monitor_Installer.exe** 在 **bin** 文件夹下，双击即可启动安装。
+安装包 **LTM_Monitor_Installer.exe** 见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Mnitor_V0.3.1)。
 
 ## 软件界面
 
