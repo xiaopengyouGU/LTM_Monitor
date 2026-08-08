@@ -28,7 +28,7 @@ StatusBar::StatusBar(QWidget *parent)
     // 信息标签
     labInfo = new QLabel(this);
     labInfo->setMinimumWidth(300);
-    labInfo->setText("欢迎使用: LTM_Monitor V0.2.0");
+    labInfo->setText("欢迎使用: LTM_Monitor V0.3.0");
     layout->addWidget(labInfo, 3);
     addSeparator(layout);
 

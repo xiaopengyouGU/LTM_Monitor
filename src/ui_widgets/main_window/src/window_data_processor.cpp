@@ -3,13 +3,28 @@
 #include "chart.h"
 #include "serial.h"
 
+#include <cstring>
 
 WindowDataProcessor::WindowDataProcessor(QObject *parent):QObject(parent)
 {
+    static const bool registered = []() {
+        qRegisterMetaType<CanfdFrameRow>("CanfdFrameRow");
+        qRegisterMetaType<QList<CanfdFrameRow>>("QList<CanfdFrameRow>");
+        return true;
+    }();
+    Q_UNUSED(registered);
+
     m_manager = nullptr;
     m_pidNum = nullptr;
     trailingZeros = QRegularExpression("0+$");
     trailingDot   = QRegularExpression("\\.$");
+
+    // CAN-FD 排水定时器（与槽函数同在 process_thread 中运行）
+    m_canDrainTimer = new QTimer(this);
+    m_canDrainTimer->setInterval(CANFD_DRAIN_MS);
+    m_canDrainTimer->setSingleShot(false);
+    m_canDrainTimer->stop();
+    connect(m_canDrainTimer, &QTimer::timeout, this, &WindowDataProcessor::do_canfdDrain);
 }
 
 void WindowDataProcessor::setManager(ChartManager *manager)                     //设置图表管理器
@@ -52,12 +67,12 @@ void WindowDataProcessor::do_serialDataUpdated(uint8_t type, const QByteArray& d
             int cnt = (int)data.size() >> 2;                  //除以4字节（float）
             cnt = qMin(cnt, CURVES_SIZE);
             QList<ChannelData> dataNum(cnt);
-            
+
             for(int i = 0; i < cnt; i++){
                 float target = m_pidNum->at(i).target;     //此处的ch取值 0 - 4 开始的，实际对应通道CH1——CH5
                 (*m_pidNum)[i].actual = values[i];         //记录实际值
                 dataNum[i].timestamp.append(ts_now);       //时间戳相同
-                dataNum[i].actual.append(values[i]);       //添加实际值       
+                dataNum[i].actual.append(values[i]);       //添加实际值
                 dataNum[i].target.append(target);          //添加目标值
             }
             m_manager->addData(dataNum);                   //批量添加，更高效
@@ -72,7 +87,7 @@ void WindowDataProcessor::do_serialDataUpdated(uint8_t type, const QByteArray& d
                 }
                 emit pidActualChanged(strNum);              //发送数据到 UI 主线程
             }
-            break;   
+            break;
         }
         case Data_Channel1:
         case Data_Channel2:
@@ -89,7 +104,7 @@ void WindowDataProcessor::do_serialDataUpdated(uint8_t type, const QByteArray& d
             float target = m_pidNum->at(ch).target;      //此处的ch取值 0 - 4 开始的，实际对应通道CH1——CH5
             (*m_pidNum)[ch].actual = actual;             //记录实际值
             m_manager->addData(ch, target, actual);      //数据存储
-            
+
             if(count[ch]++ % 3 == 0){
                 QString str = QString::number(actual, 'f', 3);      // 先固定3位小数,最多显示小数点后三位
                 str.remove(trailingZeros).remove(trailingDot);      // 去除末尾零及可能的小数点
@@ -118,4 +133,100 @@ void WindowDataProcessor::do_serialDataUpdated(uint8_t type, const QByteArray& d
 
     }
 
+}
+
+/********************************** CAN-FD 中转 ************************************/
+bool WindowDataProcessor::loadCanfdProtocol(const QString &filePath, QString *error)
+{
+    if (filePath.endsWith(".dbc", Qt::CaseInsensitive))
+        return m_dataMap.loadDbc(filePath, error);
+    return m_dataMap.loadJson(filePath, error);
+}
+
+void WindowDataProcessor::clearCanfd()
+{
+    m_canBuf.clear();
+    m_canDrainTimer->stop();
+    std::memset(m_holdValid, 0, sizeof(m_holdValid));
+}
+
+void WindowDataProcessor::do_canfdDataUpdated(const QList<CanfdFrame> &frames)
+{
+    // 中转站职责：把原始帧解析为表格行（格式化在源头做一次），转发给表格
+    QList<CanfdFrameRow> rows;
+    rows.reserve(frames.size());
+    for (const CanfdFrame &f : frames)
+        rows.append(CanfdFrameRow::fromFrame(f, false));
+    emit canfdRowsReceived(rows);
+    int dropped = 0;
+    for (const CanfdFrame &f : frames) {
+        if (m_canBuf.size() >= CANFD_BUF_MAX) {
+            dropped++;               // 缓冲已满，丢弃剩余新帧
+            continue;
+        }
+        m_canBuf.append(f);
+    }
+    if (dropped > 0) {
+        m_canfdDropCount += dropped;
+        emit canfdDropped(dropped, m_canfdDropCount);
+    }
+    if (m_canBuf.size() >= CANFD_DRAIN_THRESHOLD)
+        do_canfdDrain();             // 突发：达到阈值立即排水
+    else if (!m_canDrainTimer->isActive())
+        m_canDrainTimer->start();    // 涓流：定时器兜底
+}
+
+void WindowDataProcessor::do_canfdFramesSent(const QList<CanfdFrame> &frames)
+{
+    // 与接收同源：帧 -> 表格行（格式化在源头做一次），发给表格
+    QList<CanfdFrameRow> rows;
+    rows.reserve(frames.size());
+    for (const CanfdFrame &f : frames)
+        rows.append(CanfdFrameRow::fromFrame(f, true));
+    emit canfdRowsSent(rows);
+}
+
+void WindowDataProcessor::do_canfdDrain()
+{
+    if (m_canBuf.isEmpty()) {
+        m_canDrainTimer->stop();
+        return;
+    }
+
+    QVector<CanfdFrame> frames;
+    frames.swap(m_canBuf);           // 整批取出，避免逐帧拷贝
+    if (m_canBuf.isEmpty())
+        m_canDrainTimer->stop();
+
+    for (int i = 0; i < frames.size(); i++) {
+        const CanfdFrame &frame = frames[i];
+        QList<DataMapDecodedSignal> sigs;
+        QString err;
+        qint64 arrivalMs = frame.timestampEpochMs > 0 ? frame.timestampEpochMs : QDateTime::currentMSecsSinceEpoch();
+        if (m_dataMap.decode(frame.id, frame.isEff(), frame.data, sigs, &err))
+            drainToChart(sigs, arrivalMs);
+        // 未定义的 ID 直接忽略，保持通道上一个有效值
+    }
+}
+
+void WindowDataProcessor::drainToChart(const QList<DataMapDecodedSignal> &sigs, qint64 arrivalMs)
+{
+    if (!m_manager)     return;
+
+    // 先更新各通道的采样保持值
+    for (const DataMapDecodedSignal &s : sigs) {
+        if (s.chartChannel < 1 || s.chartChannel > CURVES_SIZE)
+            continue;                // 0 = 不映射（仅表格/日志）
+        int ch = s.chartChannel - 1;
+        int idx = s.isTarget ? 0 : 1;
+        m_holdValue[ch][idx] = s.value;
+        m_holdValid[ch][idx] = true;
+    }
+
+    // 成对写入：另一半未更新的信号保持上次值（sample-and-hold）
+    for (int ch = 0; ch < CURVES_SIZE; ch++) {
+        if (!m_holdValid[ch][0] && !m_holdValid[ch][1])
+            continue;
+        m_manager->addData(ch, m_holdValue[ch][0], m_holdValue[ch][1], arrivalMs);
+    }
 }

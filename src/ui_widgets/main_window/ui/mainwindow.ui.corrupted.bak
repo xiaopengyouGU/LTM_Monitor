@@ -63,24 +63,24 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="serialConfig">
        <attribute name="title">
-        <string>串口</string>
+        <string>??????</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout" rowstretch="1,1,1,1,1,1" columnstretch="1,2">
         <item row="2" column="0">
          <widget class="QLabel" name="label_3">
           <property name="text">
-           <string>校验位</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
         <item row="0" column="0">
          <widget class="QLabel" name="label">
           <property name="text">
-           <string>端口</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -142,7 +142,7 @@
         <item row="5" column="0">
          <widget class="QLabel" name="labOperate">
           <property name="text">
-           <string>操作</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -265,21 +265,21 @@
         <item row="4" column="0">
          <widget class="QLabel" name="label_5">
           <property name="text">
-           <string>停止位</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
         <item row="1" column="0">
          <widget class="QLabel" name="label_2">
           <property name="text">
-           <string>波特率</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
         <item row="3" column="0">
          <widget class="QLabel" name="label_4">
           <property name="text">
-           <string>数据位</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -298,7 +298,7 @@
            </size>
           </property>
           <property name="text">
-           <string>打开串口</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -328,14 +328,14 @@
            </size>
           </property>
           <property name="text">
-           <string>数据段</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
         <item row="0" column="0">
          <widget class="QLabel" name="label_21">
           <property name="text">
-           <string>设备</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -458,7 +458,7 @@
         <item row="1" column="0">
          <widget class="QLabel" name="label_20">
           <property name="text">
-           <string>仲裁段</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -497,14 +497,14 @@
            </size>
           </property>
           <property name="text">
-           <string>打开CAN-FD</string>
+           <string>??????CAN-FD</string>
           </property>
          </widget>
         </item>
         <item row="4" column="0">
          <widget class="QLabel" name="label_19">
           <property name="text">
-           <string>标准</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -569,7 +569,7 @@
         <item row="6" column="0">
          <widget class="QLabel" name="labOperCanfd">
           <property name="text">
-           <string>操作</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -606,7 +606,7 @@
         <item row="3" column="0">
          <widget class="QLabel" name="label_23">
           <property name="text">
-           <string>通道数</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -614,7 +614,7 @@
       </widget>
       <widget class="QWidget" name="tab">
        <attribute name="title">
-        <string>参数</string>
+        <string>??????</string>
        </attribute>
       </widget>
      </widget>
@@ -626,9 +626,9 @@
       </property>
       <widget class="QStackedWidget" name="stackedWidget">
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
-       <widget class="QWidget" name="pageView">
+       <widget class="QWidget" name="page">
         <layout class="QGridLayout" name="gridLayout_5">
          <property name="leftMargin">
           <number>0</number>
@@ -657,7 +657,7 @@
          </item>
         </layout>
        </widget>
-       <widget class="QWidget" name="pageCanfd"/>
+       <widget class="QWidget" name="page_2"/>
       </widget>
       <widget class="QGroupBox" name="terminal">
        <property name="minimumSize">
@@ -667,20 +667,20 @@
         </size>
        </property>
        <property name="title">
-        <string>控制台</string>
+        <string>?????????</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_4">
         <item row="5" column="2">
          <widget class="QPushButton" name="btnSend">
           <property name="text">
-           <string>发送指令</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
         <item row="0" column="2">
          <widget class="QPushButton" name="btnClearRev">
           <property name="text">
-           <string>清除接收</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -700,7 +700,7 @@
         <item row="5" column="0">
          <widget class="QLabel" name="label_11">
           <property name="text">
-           <string>指令：</string>
+           <string>?????????</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -713,21 +713,21 @@
         <item row="2" column="2">
          <widget class="QPushButton" name="btnSaveCmd">
           <property name="text">
-           <string>保存控制台</string>
+           <string>???????????????</string>
           </property>
          </widget>
         </item>
         <item row="1" column="2">
          <widget class="QPushButton" name="btnHelp">
           <property name="text">
-           <string>帮助指令</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
         <item row="3" column="2">
          <widget class="QPushButton" name="btnShowMotor">
           <property name="text">
-           <string>电机配置</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -774,7 +774,7 @@
         </rect>
        </property>
        <attribute name="label">
-        <string>PID调试</string>
+        <string>PID??????</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1" columnminimumwidth="1,1">
         <item row="7" column="1">
@@ -801,7 +801,7 @@
         <item row="5" column="0">
          <widget class="QPushButton" name="btnPeriod">
           <property name="text">
-           <string>周期</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -847,7 +847,7 @@
         <item row="7" column="0">
          <widget class="QPushButton" name="btnTarget">
           <property name="text">
-           <string>目标值</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -881,7 +881,7 @@
         <item row="0" column="0">
          <widget class="QLabel" name="label_7">
           <property name="text">
-           <string>选择通道</string>
+           <string>????????????</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -898,14 +898,14 @@
         <item row="4" column="0" colspan="2">
          <widget class="QPushButton" name="btnPID">
           <property name="text">
-           <string>发送PID参数</string>
+           <string>??????PID??????</string>
           </property>
          </widget>
         </item>
         <item row="6" column="0">
          <widget class="QPushButton" name="btnActual">
           <property name="text">
-           <string>实际值</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -931,13 +931,13 @@
         </rect>
        </property>
        <attribute name="label">
-        <string>电机配置</string>
+        <string>????????????</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_6" columnstretch="1,1">
         <item row="0" column="0">
          <widget class="QLabel" name="label_12">
           <property name="text">
-           <string>选择电机</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -953,7 +953,7 @@
         <item row="1" column="0">
          <widget class="QLabel" name="label_13">
           <property name="text">
-           <string>控制模式</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -964,37 +964,37 @@
           </property>
           <item>
            <property name="text">
-            <string>位置控制</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>速度控制</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>力矩控制</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>开环速度</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>开环位置</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>无感速度</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>快速停机</string>
+            <string>????????????</string>
            </property>
           </item>
          </widget>
@@ -1002,7 +1002,7 @@
         <item row="2" column="0">
          <widget class="QLabel" name="label_14">
           <property name="text">
-           <string>位置（°）</string>
+           <string>??????????????</string>
           </property>
          </widget>
         </item>
@@ -1016,7 +1016,7 @@
         <item row="3" column="0">
          <widget class="QLabel" name="label_15">
           <property name="text">
-           <string>速度（RPM）</string>
+           <string>?????????RPM???</string>
           </property>
          </widget>
         </item>
@@ -1030,7 +1030,7 @@
         <item row="4" column="0">
          <widget class="QLabel" name="label_16">
           <property name="text">
-           <string>转矩（%）</string>
+           <string>?????????%???</string>
           </property>
          </widget>
         </item>
@@ -1044,7 +1044,7 @@
         <item row="5" column="0">
          <widget class="QLabel" name="label_17">
           <property name="text">
-           <string>目标值</string>
+           <string>?????????</string>
           </property>
          </widget>
         </item>
@@ -1064,7 +1064,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>正转</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -1077,7 +1077,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>反转</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -1090,7 +1090,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>启动</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -1103,7 +1103,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>停机</string>
+           <string>??????</string>
           </property>
          </widget>
         </item>
@@ -1119,16 +1119,16 @@
         </rect>
        </property>
        <attribute name="label">
-        <string>通讯调试</string>
+        <string>????????????</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_7" columnstretch="1,1">
         <item row="3" column="0">
          <widget class="QCheckBox" name="chkSendNewL">
           <property name="statusTip">
-           <string>勾选此项，发送指令时将自动添加回车换行！</string>
+           <string>????????????????????????????????????????????????????????????</string>
           </property>
           <property name="text">
-           <string>发送新行</string>
+           <string>????????????</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -1138,14 +1138,14 @@
         <item row="5" column="1">
          <widget class="QPushButton" name="btnSendFile">
           <property name="text">
-           <string>发送文件</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
         <item row="0" column="0">
          <widget class="QLabel" name="labProt">
           <property name="text">
-           <string>串口协议</string>
+           <string>????????????</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
@@ -1155,7 +1155,7 @@
         <item row="2" column="0">
          <widget class="QCheckBox" name="chkSendPeriod">
           <property name="text">
-           <string>定时发送</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -1163,12 +1163,12 @@
          <widget class="QComboBox" name="comboProt">
           <item>
            <property name="text">
-            <string>LTM协议</string>
+            <string>LTM??????</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>普通串口</string>
+            <string>????????????</string>
            </property>
           </item>
           <item>
@@ -1186,7 +1186,7 @@
         <item row="1" column="0">
          <widget class="QLabel" name="label_18">
           <property name="text">
-           <string>发送周期</string>
+           <string>????????????</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
@@ -1212,35 +1212,35 @@
         <item row="2" column="1">
          <widget class="QCheckBox" name="chkHexSend">
           <property name="text">
-           <string>16进制发送</string>
+           <string>16????????????</string>
           </property>
          </widget>
         </item>
         <item row="5" column="0">
          <widget class="QPushButton" name="btnOpenFile">
           <property name="text">
-           <string>打开文件</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
         <item row="3" column="1">
          <widget class="QCheckBox" name="chkHexShow">
           <property name="text">
-           <string>16进制显示</string>
+           <string>16????????????</string>
           </property>
          </widget>
         </item>
         <item row="4" column="0">
          <widget class="QPushButton" name="btnStopRecv">
           <property name="text">
-           <string>暂停接收</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
         <item row="4" column="1">
          <widget class="QPushButton" name="btnClearRecv">
           <property name="text">
-           <string>清除接收</string>
+           <string>????????????</string>
           </property>
          </widget>
         </item>
@@ -1282,19 +1282,19 @@
        </size>
       </property>
       <property name="title">
-       <string>图表控制</string>
+       <string>????????????</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_3">
        <item row="1" column="1">
         <widget class="QComboBox" name="comboMode">
          <item>
           <property name="text">
-           <string>自动模式</string>
+           <string>????????????</string>
           </property>
          </item>
          <item>
           <property name="text">
-           <string>手动模式</string>
+           <string>????????????</string>
           </property>
          </item>
         </widget>
@@ -1302,49 +1302,49 @@
        <item row="4" column="0">
         <widget class="QPushButton" name="btnStart">
          <property name="text">
-          <string>启动</string>
+          <string>??????</string>
          </property>
         </widget>
        </item>
        <item row="4" column="1">
         <widget class="QPushButton" name="btnReset">
          <property name="text">
-          <string>复位</string>
+          <string>??????</string>
          </property>
         </widget>
        </item>
        <item row="1" column="0">
         <widget class="QPushButton" name="btnMode">
          <property name="text">
-          <string>模式</string>
+          <string>??????</string>
          </property>
         </widget>
        </item>
        <item row="2" column="1">
         <widget class="QPushButton" name="btnStopShow">
          <property name="text">
-          <string>停止显示</string>
+          <string>????????????</string>
          </property>
         </widget>
        </item>
        <item row="2" column="0">
         <widget class="QPushButton" name="btnClearShow">
          <property name="text">
-          <string>清空显示</string>
+          <string>????????????</string>
          </property>
         </widget>
        </item>
        <item row="0" column="0">
         <widget class="QPushButton" name="btnDataExport">
          <property name="text">
-          <string>数据导出</string>
+          <string>????????????</string>
          </property>
         </widget>
        </item>
        <item row="0" column="1">
         <widget class="QPushButton" name="btnChartShow">
          <property name="text">
-          <string>图表显示</string>
+          <string>????????????</string>
          </property>
          <property name="icon">
           <iconset resource="../../chart_dialog/img.qrc">
@@ -1368,43 +1368,35 @@
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
-     <string>文件</string>
+     <string>??????</string>
     </property>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>编辑</string>
+     <string>??????</string>
     </property>
    </widget>
    <widget class="QMenu" name="menuSet">
     <property name="title">
-     <string>设置</string>
+     <string>??????</string>
     </property>
-    <widget class="QMenu" name="menuTerminalCode">
-     <property name="title">
-      <string>控制台编码</string>
-     </property>
-     <addaction name="actTerminalUtf8"/>
-     <addaction name="actTerminalGbk"/>
-    </widget>
-    <addaction name="menuTerminalCode"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
-     <string>数据分析</string>
+     <string>????????????</string>
     </property>
     <addaction name="actImportCSV"/>
     <addaction name="actImportDB"/>
    </widget>
    <widget class="QMenu" name="menuLog">
     <property name="title">
-     <string>日志系统</string>
+     <string>????????????</string>
     </property>
     <addaction name="actOpenLog"/>
    </widget>
    <widget class="QMenu" name="menu">
     <property name="title">
-     <string>帮助</string>
+     <string>??????</string>
     </property>
     <addaction name="actUseIntro"/>
    </widget>
@@ -1419,7 +1411,7 @@
    </widget>
    <widget class="QMenu" name="menuAbout">
     <property name="title">
-     <string>关于...</string>
+     <string>??????...</string>
     </property>
    </widget>
    <addaction name="menuFile"/>
@@ -1438,10 +1430,10 @@
      <normaloff>:/icon/images/124.bmp</normaloff>:/icon/images/124.bmp</iconset>
    </property>
    <property name="text">
-    <string>导入csv数据</string>
+    <string>??????csv??????</string>
    </property>
    <property name="toolTip">
-    <string>导入csv数据</string>
+    <string>??????csv??????</string>
    </property>
    <property name="shortcut">
     <string>Shift+A</string>
@@ -1453,10 +1445,10 @@
      <normaloff>:/icon/images/open3.bmp</normaloff>:/icon/images/open3.bmp</iconset>
    </property>
    <property name="text">
-    <string>导入数据库</string>
+    <string>???????????????</string>
    </property>
    <property name="toolTip">
-    <string>导入数据库</string>
+    <string>???????????????</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+D</string>
@@ -1466,15 +1458,11 @@
    </property>
   </action>
   <action name="actOpenLog">
-   <property name="icon">
-    <iconset resource="../../chart_dialog/img.qrc">
-     <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
-   </property>
    <property name="text">
-    <string>打开日志分析器</string>
+    <string>?????????????????????</string>
    </property>
    <property name="toolTip">
-    <string>打开日志分析器</string>
+    <string>?????????????????????</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+L</string>
@@ -1489,10 +1477,10 @@
      <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
    </property>
    <property name="text">
-    <string>使用说明</string>
+    <string>????????????</string>
    </property>
    <property name="toolTip">
-    <string>LTM_Monitor的使用说明</string>
+    <string>LTM_Monitor???????????????</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
@@ -1504,10 +1492,10 @@
      <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
    </property>
    <property name="text">
-    <string>设备操作</string>
+    <string>????????????</string>
    </property>
    <property name="toolTip">
-    <string>CAN-FD设备操作</string>
+    <string>CAN-FD????????????</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
@@ -1519,10 +1507,10 @@
      <normaloff>:/icon/images/open3.bmp</normaloff>:/icon/images/open3.bmp</iconset>
    </property>
    <property name="text">
-    <string>导入协议（DBC等）</string>
+    <string>???????????????DBC??????</string>
    </property>
    <property name="toolTip">
-    <string>导入DBC文件或用户自定义协议</string>
+    <string>??????DBC??????????????????????????????</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
@@ -1534,10 +1522,10 @@
      <normaloff>:/icon/images/124.bmp</normaloff>:/icon/images/124.bmp</iconset>
    </property>
    <property name="text">
-    <string>设计协议</string>
+    <string>????????????</string>
    </property>
    <property name="toolTip">
-    <string>设计用户自定义协议</string>
+    <string>???????????????????????????</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
@@ -1549,32 +1537,10 @@
      <normaloff>:/icon/images/icon.ico</normaloff>:/icon/images/icon.ico</iconset>
    </property>
    <property name="text">
-    <string>显示 CAN-FD 界面</string>
+    <string>?????? CAN-FD ??????</string>
    </property>
    <property name="toolTip">
-    <string>显示 CAN-FD 界面</string>
-   </property>
-   <property name="menuRole">
-    <enum>QAction::MenuRole::NoRole</enum>
-   </property>
-  </action>
-  <action name="actTerminalUtf8">
-   <property name="text">
-    <string>UTF-8 编码</string>
-   </property>
-   <property name="toolTip">
-    <string>采用UTF-8 编码</string>
-   </property>
-   <property name="menuRole">
-    <enum>QAction::MenuRole::NoRole</enum>
-   </property>
-  </action>
-  <action name="actTerminalGbk">
-   <property name="text">
-    <string>GBK 编码</string>
-   </property>
-   <property name="toolTip">
-    <string>采用GBK 编码</string>
+    <string>?????? CAN-FD ??????</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>

@@ -49,8 +49,11 @@ target_link_libraries(${PROJECT_NAME}   PUBLIC
 target_link_libraries(${PROJECT_NAME}   PUBLIC
         chart
         serial
+        canfd
         record
+        data_map
         chart_dialog
+        canfd_widget
         log_analysis
 ) 
 
