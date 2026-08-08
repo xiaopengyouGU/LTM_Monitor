@@ -33,7 +33,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/output/Debug)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/output/Release)
 
 # 按顺序添加模块子目录
-add_subdirectory(src/modules)                  
+add_subdirectory(src/modules)
+add_subdirectory(src/components)                  
 add_subdirectory(src/ui_widgets)
 add_subdirectory(src/application)
 
@@ -54,7 +55,9 @@ install(TARGETS ${APP_NAME}
 set(MODULE_TARGETS
     chart
     serial
+    canfd
     record
+    data_map
     log_analysis
     chart_dialog
     main_window
@@ -73,7 +76,9 @@ endforeach()
 # 3. 安装每个模块的头文件（直接平铺到 include/ 下，模块间需保证文件名唯一）
 install(DIRECTORY src/modules/chart/include/ DESTINATION include/chart)
 install(DIRECTORY src/modules/serial/include/ DESTINATION include/serial)
+install(DIRECTORY src/modules/canfd/include/ DESTINATION include/canfd)
 install(DIRECTORY src/modules/record/include/ DESTINATION include/record)
+install(DIRECTORY src/components/data_map/include/ DESTINATION include/data_map)
 install(DIRECTORY src/ui_widgets/log_analysis/include/ DESTINATION include/log_analysis)
 install(DIRECTORY src/ui_widgets/main_window/include/ DESTINATION include/main_window)
 install(DIRECTORY src/ui_widgets/chart_dialog/include/ DESTINATION include/chart_dialog)
