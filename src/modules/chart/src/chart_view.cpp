@@ -7,12 +7,14 @@ ChartView::ChartView(QWidget *parent) : QChartView(parent)
     isPanning = false;
     lastPanPos = QPointF();
     setRenderHint(QPainter::Antialiasing);   //启用抗锯齿
+    QFont f = font();
+    f.setPointSize(10);                      // 图表默认字体 9 -> 10，提升可读性
+    setFont(f);
 }
 
 void ChartView::wheelEvent(QWheelEvent *event)
-{   //只在手动模式下启用缩放
-    if (!chart() || !m_manager || m_manager->getMode() != Mode_Hand) 
-    {
+{   // 只在手动模式下启用缩放
+    if (!chart() || !m_manager || m_manager->getMode() != Mode_Hand) {
         QChartView::wheelEvent(event);
         return;
     }
@@ -139,8 +141,6 @@ void ChartView::zoomAxis(QValueAxis *axis, double center, qreal factor)
 void ChartView::setChartManager(ChartManager *manager)
 {
     if(!manager)        return;     //判空
-    QChart *chart = manager->getChart();
     m_manager = manager;
-    setChart(chart);                //设置图表对象
     m_manager->setChartView(this);  //绑定图表
 }

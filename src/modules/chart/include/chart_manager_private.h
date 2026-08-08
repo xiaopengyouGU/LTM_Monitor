@@ -9,6 +9,7 @@ class DataExporter;
 
 #include "chart_manager.h"
 #include <QFutureWatcher>
+#include <QChart>
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -47,7 +48,7 @@ public:
     void stop();
     void setPeriod(int ms);
     void setChannelVisible(int ch, bool targetVisible, bool actualVisible);
-    void setLegendName(int ch, const QString& name);
+    void setLegendName(int ch, const QString& target, const QString& actual);  // 复用通道，减少内存开销
     void setMode(int mode);
     void setAbsTime(bool isAbs);
     void setBackColor(int color);
@@ -56,7 +57,6 @@ public:
     void clearShow();
     void stopShow();
     int  getMode() const;
-    QChart* getChart() const;
     void addData(int ch, float target, float actual);
     void addData(int channel, float target, float actual, qint64 timestamp);
     void addData(const QList<ChannelData>& dataNum);         // 添加一批数据
@@ -108,10 +108,10 @@ private:
     DataImporter *m_importer;
     DataExporter *m_exporter;
     QTimer *m_timer;
-    ChartView     *m_chartView;             //视图对象
+    ChartView     *m_chartView;             // 视图对象
     bool m_isUpdating = false;   // 是否正在执行并行降采样任务
     QFutureWatcher<SeriesResult>* m_activeWatcher = nullptr;  // 跟踪当前活动的并行任务
-// private:                         //压力测试
+// private:                         // 压力测试
 //     int m_updateTotal = 0;
 //     int m_updateSkipped = 0;
 //     int m_taskStarted = 0;

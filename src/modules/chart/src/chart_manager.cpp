@@ -100,6 +100,7 @@ void ChartManager::Private::buildChart()
 
     m_xAxis->setRange(-m_timewindow, 0);
     m_yAxis->setRange(-5, 5);
+
     _setBackColor();
     m_targetSeries[0]->setVisible(true);
     m_actualSeries[0]->setVisible(true);
@@ -173,24 +174,23 @@ void ChartManager::Private::setChannelVisible(int ch, bool targetVisible, bool a
         m_actualSeries[ch]->setVisible(actualVisible);
 }
 
-void ChartManager::Private::setLegendName(int ch, const QString& name)
+void ChartManager::Private::setLegendName(int ch, const QString& target, const QString& actual)  //复用通道，减少内存开销
 {
     if (ch < 0 || ch >= m_count) return;
     QLineSeries *series = m_targetSeries[ch];
-    if (series->name() != name)
-        series->setName(name + QString("目标值"));
+    if (series->name() != target)
+        series->setName(target);
     series = m_actualSeries[ch];
-    if (series->name() != name)
-        series->setName(name + QString("实际值"));
+    if (series->name() != actual)
+        series->setName(actual);
 }
 
 void ChartManager::Private::setMode(int mode)
 {
     if (mode == m_mode) return;
     m_mode = mode;
-    //模式切换后，一般100ms内会更新（实时系统）
-    if(m_mode == Mode_Auto)
-    {
+    // 模式切换后，一般100ms内会更新（实时系统）
+    if(m_mode == Mode_Auto) {
         updateTimerPeriod();   // 更新时间周期
         updateData();          // 立即刷新
     }
@@ -198,16 +198,16 @@ void ChartManager::Private::setMode(int mode)
 
 void ChartManager::Private::setAbsTime(bool isAbs)
 {
-    if(isAbs == m_useAbsTime)   return;
+    if (isAbs == m_useAbsTime)   return;
 
     m_useAbsTime = isAbs;
     // 转换X轴范围以保持相同的数据区间
     qreal minX = m_xAxis->min();
     qreal maxX = m_xAxis->max();
     qint64 now = QDateTime::currentMSecsSinceEpoch();
-    //得有数据的情况下，才会调用更新m_baseTime，否则接口是无效的
-    if(isAbs) 
-    {   // 从相对时间切换到绝对时间
+    // 得有数据的情况下，才会调用更新m_baseTime，否则接口是无效的
+    if(isAbs) {   
+        // 从相对时间切换到绝对时间
         // 相对时间：X = (时间戳 - now) / 1000
         qint64 startTime = now + qint64(minX * 1000.0);
         qint64 endTime   = now + qint64(maxX * 1000.0);
@@ -215,9 +215,8 @@ void ChartManager::Private::setAbsTime(bool isAbs)
         qreal newMinX = (startTime - m_baseTime) / 1000.0;
         qreal newMaxX = (endTime   - m_baseTime) / 1000.0;
         m_xAxis->setRange(newMinX, newMaxX);
-    } 
-    else 
-    {  // 从绝对时间切换到相对时间
+    } else {  
+        // 从绝对时间切换到相对时间
         // 绝对时间：X = (时间戳 - base) / 1000
         qint64 startTime = m_baseTime + qint64(minX * 1000.0);
         qint64 endTime   = m_baseTime + qint64(maxX * 1000.0);
@@ -230,27 +229,41 @@ void ChartManager::Private::setAbsTime(bool isAbs)
 
 void ChartManager::Private::setBackColor(int color)
 {
-    if(color == m_color) return;
+    if (color == m_color)   return;
     m_color = color;
     _setBackColor();
 }
 
 void ChartManager::Private::setWindowTime(int windowTime) // 设置自动模式窗口的长度：单位s
 {
-    if(windowTime < MIN_WINDOW_TIME || windowTime > MAX_WINDOW_TIME)
-        windowTime = WINDOW_TIME;                        //采用默认值
+    if (windowTime < MIN_WINDOW_TIME || windowTime > MAX_WINDOW_TIME)
+        windowTime = WINDOW_TIME;                        // 采用默认值
     m_timewindow = windowTime;
-    if(m_mode == Mode_Auto)
-    {
-        updateTimerPeriod();   // 更新时间周期
-        updateData();          // 立即刷新
+    if (m_mode == Mode_Auto) {
+        updateTimerPeriod();        // 更新时间周期
+        updateData();               // 立即刷新
     }
 }                                                        // 设置自动模式窗口的长度：单位s
 
 void ChartManager::Private::setChartView(ChartView* chartView)                // 绑定视图对象
 {
-    if(!chartView)      return;     //判空
+    if (!chartView)      return;     //判空
     m_chartView = chartView;
+    chartView->setChart(m_chart);
+    int fontSize = chartView->font().pointSize();
+    // 图表字体统一调整（默认 9）：chart/图例/坐标轴标签都要显式设置。
+    // 轴标签字体不跟随 chart->setFont，必须单独 setLabelsFont。
+    QFont chartFont = m_chart->font();
+    chartFont.setPointSize(fontSize);
+    m_chart->setFont(chartFont);
+    m_chart->legend()->setFont(chartFont);
+    m_xAxis->setLabelsFont(chartFont);
+    m_yAxis->setLabelsFont(chartFont);
+    // 轴标题放大（放在 setTitleVisible 附近即可）
+    QFont titleFont = m_xAxis->titleFont();
+    titleFont.setPointSize(fontSize);                 
+    m_xAxis->setTitleFont(titleFont);
+    m_yAxis->setTitleFont(titleFont);
 }   
 
 void ChartManager::Private::clearShow()
@@ -261,8 +274,7 @@ void ChartManager::Private::clearShow()
 
 void ChartManager::Private::stopShow()
 {
-    for(int i = 0; i < m_count; ++i)
-    {
+    for (int i = 0; i < m_count; ++i) {
         m_actualSeries[i]->setVisible(false);
         m_targetSeries[i]->setVisible(false);
     }
@@ -273,14 +285,9 @@ int ChartManager::Private::getMode() const
     return m_mode;
 }
 
-QChart* ChartManager::Private::getChart() const
-{
-    return m_chart;
-}
-
 void ChartManager::Private::addData(int ch, float target, float actual)
 {
-    if (ch < 0 || ch >= m_count) return;
+    if (ch < 0 || ch >= m_count)    return;
     m_storage->addData(ch, target, actual);  
 }
 
@@ -292,8 +299,8 @@ void ChartManager::Private::addData(int ch, float target, float actual, qint64 t
 
 void ChartManager::Private::addData(const QList<ChannelData>& dataNum)                           //添加一批数据
 {
-    if(!dataNum.size())     return;         //空数据直接返回
-    m_storage->addData(dataNum);            //添加数据
+    if(!dataNum.size())     return;         // 空数据直接返回
+    m_storage->addData(dataNum);            // 添加数据
 }         
 
 void ChartManager::Private::importData(const QString& fileName)
@@ -314,7 +321,7 @@ void ChartManager::Private::updateData()
     // 从而保证最终显示的是最新范围的数据，同时避免中间范围的无用计算。
     // m_updateTotal++;
     // if (m_isUpdating) { m_updateSkipped++; return; }
-    if(m_isUpdating)    return;
+    if (m_isUpdating)    return;
     // 1. 检查是否有新数据
     qint64 startTime, endTime;                        // 数据时间戳的范围
     qint64 viewStart, viewEnd;
@@ -469,22 +476,19 @@ void ChartManager::Private::_setBackColor()
     }
 }
 
-void ChartManager::Private::_getViewRange(qint64& viewStart, qint64& viewEnd)     //直接获取当前视图范围
+void ChartManager::Private::_getViewRange(qint64& viewStart, qint64& viewEnd) // 直接获取当前视图范围
 {
-    qint64 now = QDateTime::currentMSecsSinceEpoch();                       //获取当前时间戳
-    qint64 base = m_storage->getBaseTimestamp();                            //获取基准时间戳
-    if(base == -1){                                                         //说明此时还没有接收到数据
+    qint64 now = QDateTime::currentMSecsSinceEpoch();                       // 获取当前时间戳
+    qint64 base = m_storage->getBaseTimestamp();                            // 获取基准时间戳
+    if (base == -1){                                                        // 说明此时还没有接收到数据
         viewStart = now;
         viewEnd = now;
         return;                                  
     }
-    if(m_mode == Mode_Auto)   // 自动模式
-    {
+    if (m_mode == Mode_Auto) {    // 自动模式
         viewStart = now - m_timewindow * 1000;
         viewEnd = now;
-    }
-    else   // 手动模式
-    {
+    } else {                      // 手动模式
         qreal minX = m_xAxis->min();
         qreal maxX = m_xAxis->max();
 
@@ -612,16 +616,15 @@ void ChartManager::start()                      { pimpl->start();}
 void ChartManager::stop()                       { pimpl->stop(); }
 void ChartManager::setPeriod(int ms)            { pimpl->setPeriod(ms); }
 void ChartManager::setChannelVisible(int channel, bool targetVisible, bool actualVisible) { pimpl->setChannelVisible(channel, targetVisible, actualVisible); }
-void ChartManager::setLegendName(int channel, const QString& name) { pimpl->setLegendName(channel, name); }
 void ChartManager::setMode(int mode)            { pimpl->setMode(mode); }
 void ChartManager::setAbsTime(bool isAbs)       { pimpl->setAbsTime(isAbs); }
 void ChartManager::setBackColor(int color)      { pimpl->setBackColor(color); }
+void ChartManager::setLegendName(int ch, const QString& target, const QString& actual)  { pimpl->setLegendName(ch, target, actual);}
 void ChartManager::setChartView(ChartView *chartView)   { pimpl->setChartView(chartView); }
 void ChartManager::setWindowTime(int windowTime){ pimpl->setWindowTime(windowTime); }
 void ChartManager::clearShow()                  { pimpl->clearShow(); }
 void ChartManager::stopShow()                   { pimpl->stopShow(); }
 int ChartManager::getMode() const               { return pimpl->getMode(); }
-QChart* ChartManager::getChart() const          { return pimpl->getChart(); }
 void ChartManager::addData(int ch, float target, float actual) { pimpl->addData(ch, target, actual); }
 void ChartManager::addData(int ch, float target, float actual, qint64 timestamp) { pimpl->addData(ch, target, actual, timestamp);}
 void ChartManager::addData(const QList<ChannelData>& dataNum) { pimpl->addData(dataNum);}
