@@ -1,6 +1,6 @@
 # LTM_Monitor – 基于Qt6的上位机监控调试软件
 
-基于 **Qt 6** 开发的上位机监控调试软件，支持串口通讯、动态曲线显示、在线PID调参、CSV数据导出等功能。
+基于 **Qt 6** 开发的上位机监控调试软件，支持串口/CAN/CAN-FD 通讯、动态曲线显示、在线PID调参、CSV数据导出等功能。
 
 ## 安装包
 
@@ -60,9 +60,12 @@ LTM_Monitor/
 │   ├── modules/               # 动态库模块
 │   │   ├── chart/             # 图表动态库（提供实时曲线功能）
 │   │   ├── serial/            # 串口通讯动态库
+|   |   ├── canfd/             # CAN-FD 通讯动态库
 │   │   └── record/            # 数据记录动态库（数据库与日志系统）
 │   ├── ui_widgets/
 │   │   ├── chart_dialog/      # 图表设置对话框
+|   |   ├── log_analysis/      # 日志分析器
+|   |   ├── log_analysis/      # CAN-FD 分析界面
 │   │   └── main_window/       # 主窗口
 │   └── application/
 │       └── main.cpp           # 主程序入口
