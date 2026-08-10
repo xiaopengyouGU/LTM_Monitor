@@ -1,634 +1,569 @@
-#include <QChart>
-#include <QLineSeries>
-#include <QValueAxis>
-#include <QTimer>
-#include <QThread>
-#include <QDateTime>
-#include <QtMath>
-#include <limits>
-#include <QFuture>
-#include <QtConcurrent>
-
-#include "chart_manager.h"
 #include "chart_manager_private.h"
+#include "chart_controller.h"
 #include "data_storage.h"
 #include "data_importer.h"
 #include "data_exporter.h"
 #include "chart_def.h"
-#include "chart_view.h"
-// ========== 私有实现类 ==========
-// Private 构造函数
-ChartManager::Private::Private(int channelCount, ChartManager *parent)
-    : QObject(parent), m_manager(parent)
-{
-    //最多支持10个通道，默认支持5个通道
-    if(channelCount < 1 || channelCount > MAX_CHANNEL_NUMS) 
-            m_count = DEFUALT_CHANNEL_NUMS;
-    else    m_count = channelCount; 
 
-    buildChart();
-    buildData();
-    buildTimer();
+#include <QtConcurrent>
+#include <QThread>
+#include <cmath>
+
+// 简单原地 FFT：实数输入 -> 幅度谱（定义见文件末尾，公共接口之前）
+static void fft_real(QList<double>& re, QList<double>& im, int n);   // im 为调用方提供的虚部工作区（如 raw.times）
+
+// ============================================================
+// ChartManager::Private：模型(DataStorage) + 视图集合(ChartController) 的调度层
+// 数据写入委托给 DataStorage；显示由各 ChartController 负责。
+// ============================================================
+
+ChartManager::Private::Private(int channelCount, ChartManager *parent)
+    : QObject(parent), m_manager(parent), m_channelCount(channelCount)
+{
+    m_channelNames.fill(QString(), m_channelCount);        // 通道名初始为空，导出时回退 ChN
+    m_fftBufs.resize(m_channelCount);                      // 每通道一块频谱缓冲，并行任务零锁写入
+    m_storage = new DataStorage(MAX_CHANNEL_POINTS, m_channelCount, this);
+
+    // 导入导出工作在线程中：DataImporter / DataExporter 移入 data_thread（无 parent）
+    m_dataThread = new QThread(this);
+    m_importer   = new DataImporter(m_storage);
+    m_exporter   = new DataExporter(m_storage);
+    m_importer->moveToThread(m_dataThread);
+    m_exporter->moveToThread(m_dataThread);
+    // 绑定导入导出相关信号
+    connect(this, &Private::dataImport, m_importer, &DataImporter::do_dataImport);
+    connect(this, &Private::dataExport, m_exporter, &DataExporter::do_dataExport);
+    connect(m_importer, &DataImporter::importFinished, this, &Private::do_importFinished);
+    connect(m_importer, &DataImporter::importNames, this, &Private::do_importNames);
+    connect(m_exporter, &DataExporter::exportFinished, this, &Private::do_exportFinished);
+    m_dataThread->start();
+
+    m_timer = new QTimer(this);
+    m_timer->setInterval(m_period);
+    m_timer->setTimerType(Qt::CoarseTimer);
+    connect(m_timer, &QTimer::timeout, this, &Private::updateData);
 }
 
 ChartManager::Private::~Private()
 {
-    stop();                 //停止图表管理器
-    // 等待并发绘图任务完成，避免访问已销毁的 m_storage 等成员
-    if (m_activeWatcher) {
-        m_activeWatcher->waitForFinished();
+    if (m_activeWatcher)
+        m_activeWatcher->waitForFinished();      // 避免析构时任务还在写缓冲
+    for (QFutureWatcher<ParallelResult> *w : qAsConst(m_retiredWatchers))
+        w->waitForFinished();                    // 被丢弃的批次也要等任务结束，避免写已析构缓冲
+    if (m_dataThread && m_dataThread->isRunning()) {
+        m_dataThread->quit();
+        m_dataThread->wait();
     }
-    //对象的管理交给Qt，不必手动管理
-    //移动到线程中的对象还是得手动析构
-    delete m_importer;
+    delete m_importer;        // 线程已停，手动析构移入线程的对象
     delete m_exporter;
-    delete m_storage;
 }
 
-void ChartManager::Private::buildChart()
-{
-    m_chart = new QChart;
-    m_chart->setParent(this);       //把内存的管理交给Qt
-    m_timewindow = WINDOW_TIME;
-    m_mode = SHOW_MODE;             //默认自动模式
-    m_useAbsTime = false;
-    m_endTime = 0;
-    m_baseTime = 0;
-    m_color = WINDOW_COLOR;         //默认为白色
-
-    for (int i = 0; i < m_count; ++i) {
-        QLineSeries* targetSeries = new QLineSeries(m_chart);  //内存的管理交给Qt
-        targetSeries->setName(QString("CH%1目标值").arg(i+1));
-        targetSeries->setColor(targetColors[i]);
-        QPen pen = targetSeries->pen();
-        pen.setWidth(2);
-        targetSeries->setPen(pen);
-        m_targetSeries.append(targetSeries);
-        m_chart->addSeries(targetSeries);
-        targetSeries->setVisible(false);
-
-        QLineSeries* actualSeries = new QLineSeries(m_chart);
-        actualSeries->setName(QString("CH%1实际值").arg(i+1));
-        actualSeries->setColor(actualColors[i]);
-        pen = actualSeries->pen();
-        pen.setWidth(2);
-        actualSeries->setPen(pen);
-        m_actualSeries.append(actualSeries);
-        m_chart->addSeries(actualSeries);
-        actualSeries->setVisible(false);
-    }
-
-    m_xAxis = new QValueAxis(m_chart);
-    m_yAxis = new QValueAxis(m_chart);
-    m_xAxis->setTitleText("时间 (s)");
-    m_xAxis->setTickCount(11);
-    m_xAxis->setMinorTickCount(1);
-    m_yAxis->setTitleText("数值");
-    m_yAxis->setTickCount(4);
-    m_yAxis->setMinorTickCount(1);
-    m_chart->addAxis(m_xAxis, Qt::AlignBottom);
-    m_chart->addAxis(m_yAxis, Qt::AlignLeft);
-
-    for (auto series : m_targetSeries) {
-        series->attachAxis(m_xAxis);
-        series->attachAxis(m_yAxis);
-    }
-    for (auto series : m_actualSeries) {
-        series->attachAxis(m_xAxis);
-        series->attachAxis(m_yAxis);
-    }
-
-    m_xAxis->setRange(-m_timewindow, 0);
-    m_yAxis->setRange(-5, 5);
-
-    _setBackColor();
-    m_targetSeries[0]->setVisible(true);
-    m_actualSeries[0]->setVisible(true);
-
-    connect(m_xAxis, &QValueAxis::rangeChanged, this, &Private::do_XRangeChanged);
-}
-
-void ChartManager::Private::buildData()
-{
-    data_thread = new QThread(this);
-    m_storage = new DataStorage(DEFUALT_CHANNEL_POINTS, m_count,nullptr);
-    m_importer = new DataImporter(m_storage);
-    m_exporter = new DataExporter(m_storage);
-    //移入线程的对象不能有parent
-    m_importer->moveToThread(data_thread);
-    m_exporter->moveToThread(data_thread);
-    // 连接信号
-    connect(this, &Private::dataImport, m_importer, &DataImporter::do_dataImport);
-    connect(this, &Private::dataExport, m_exporter, &DataExporter::do_dataExport);
-    connect(m_importer, &DataImporter::importFinished, this, &Private::do_importFinished);
-    connect(m_exporter, &DataExporter::exportFinished, this, &Private::do_exportFinished);
-}
-
-void ChartManager::Private::buildTimer()
-{
-    m_period = TIMER_PERIOD;                         //默认为100ms
-    m_timer = new QTimer(this);
-    m_timer->stop();
-    m_timer->setInterval(m_period);
-    m_timer->setTimerType(Qt::CoarseTimer);         //此处没有更新周期约100ms即可，不用太准+-5%
-    m_timer->setSingleShot(false);
-    connect(m_timer, &QTimer::timeout, this, &Private::updateData);
-
-    // //压力测试
-    // // chart_manager.cpp 构造函数中
-    // m_statsTimer = new QTimer(this);
-    // m_statsTimer->setInterval(2000);
-    // connect(m_statsTimer, &QTimer::timeout, this, [this]() {
-    //     qDebug() << "[pressure test] tried:" << m_updateTotal
-    //              << "skipped" << m_updateSkipped
-    //              << "started:" << m_taskStarted;
-    // m_updateTotal = m_updateSkipped = m_taskStarted = 0;
-    //});
-}
-
-void ChartManager::Private::start()
-{
-    data_thread->start();
-    m_timer->start();
-}
-
-void ChartManager::Private::stop()
-{
-    m_timer->stop();
-    data_thread->quit();
-    data_thread->wait();
-}
+// ====== 生命周期 ======
+void ChartManager::Private::start()   { m_timer->start(); }
+void ChartManager::Private::stop()    { m_timer->stop(); }
 
 void ChartManager::Private::setPeriod(int ms)
 {
-    if (ms <= 20) ms = 20;
+    if (ms < 20) ms = 20;
+    m_period = ms;
     m_timer->setInterval(ms);
 }
 
-void ChartManager::Private::setChannelVisible(int ch, bool targetVisible, bool actualVisible)
+// ====== 数据写入（全部委托给模型） ======
+void ChartManager::Private::addData(int channel, double value)
 {
-    if (ch < 0 || ch >= m_count) return;
-    if (targetVisible != m_targetSeries[ch]->isVisible())
-        m_targetSeries[ch]->setVisible(targetVisible);
-    if (actualVisible != m_actualSeries[ch]->isVisible())
-        m_actualSeries[ch]->setVisible(actualVisible);
+    m_storage->addData(channel, -1.0, value);       // -1 表示自动打时间戳
 }
 
-void ChartManager::Private::setLegendName(int ch, const QString& target, const QString& actual)  //复用通道，减少内存开销
+void ChartManager::Private::addData(int channel, double time, double value)
 {
-    if (ch < 0 || ch >= m_count) return;
-    QLineSeries *series = m_targetSeries[ch];
-    if (series->name() != target)
-        series->setName(target);
-    series = m_actualSeries[ch];
-    if (series->name() != actual)
-        series->setName(actual);
+    m_storage->addData(channel, time, value);
 }
 
-void ChartManager::Private::setMode(int mode)
+void ChartManager::Private::addData(const QList<ChannelData>& dataList)
 {
-    if (mode == m_mode) return;
-    m_mode = mode;
-    // 模式切换后，一般100ms内会更新（实时系统）
-    if(m_mode == Mode_Auto) {
-        updateTimerPeriod();   // 更新时间周期
-        updateData();          // 立即刷新
-    }
+    m_storage->addData(dataList);
 }
 
-void ChartManager::Private::setAbsTime(bool isAbs)
+// ====== 视图管理 ======
+int ChartManager::Private::createView(ViewType type)
 {
-    if (isAbs == m_useAbsTime)   return;
+    ChartController *ctrl = new ChartController();   // 控件由本对象持有，无父对象
+    ctrl->setViewType(type);
+    ctrl->setInteraction(true, true);
+    ctrl->setRangeDragAxes(true, true);
+    ctrl->setRangeZoomFactor(1.2, 1.2);
 
-    m_useAbsTime = isAbs;
-    // 转换X轴范围以保持相同的数据区间
-    qreal minX = m_xAxis->min();
-    qreal maxX = m_xAxis->max();
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-    // 得有数据的情况下，才会调用更新m_baseTime，否则接口是无效的
-    if(isAbs) {   
-        // 从相对时间切换到绝对时间
-        // 相对时间：X = (时间戳 - now) / 1000
-        qint64 startTime = now + qint64(minX * 1000.0);
-        qint64 endTime   = now + qint64(maxX * 1000.0);
-        if (startTime > endTime) std::swap(startTime, endTime);
-        qreal newMinX = (startTime - m_baseTime) / 1000.0;
-        qreal newMaxX = (endTime   - m_baseTime) / 1000.0;
-        m_xAxis->setRange(newMinX, newMaxX);
-    } else {  
-        // 从绝对时间切换到相对时间
-        // 绝对时间：X = (时间戳 - base) / 1000
-        qint64 startTime = m_baseTime + qint64(minX * 1000.0);
-        qint64 endTime   = m_baseTime + qint64(maxX * 1000.0);
-        if (startTime > endTime) std::swap(startTime, endTime);
-        qreal newMinX = (startTime - now) / 1000.0;
-        qreal newMaxX = (endTime   - now) / 1000.0;
-        m_xAxis->setRange(newMinX, newMaxX);
-    }
-}
-
-void ChartManager::Private::setBackColor(int color)
-{
-    if (color == m_color)   return;
-    m_color = color;
-    _setBackColor();
-}
-
-void ChartManager::Private::setWindowTime(int windowTime) // 设置自动模式窗口的长度：单位s
-{
-    if (windowTime < MIN_WINDOW_TIME || windowTime > MAX_WINDOW_TIME)
-        windowTime = WINDOW_TIME;                        // 采用默认值
-    m_timewindow = windowTime;
-    if (m_mode == Mode_Auto) {
-        updateTimerPeriod();        // 更新时间周期
-        updateData();               // 立即刷新
-    }
-}                                                        // 设置自动模式窗口的长度：单位s
-
-void ChartManager::Private::setChartView(ChartView* chartView)                // 绑定视图对象
-{
-    if (!chartView)      return;     //判空
-    m_chartView = chartView;
-    chartView->setChart(m_chart);
-    int fontSize = chartView->font().pointSize();
-    // 图表字体统一调整（默认 9）：chart/图例/坐标轴标签都要显式设置。
-    // 轴标签字体不跟随 chart->setFont，必须单独 setLabelsFont。
-    QFont chartFont = m_chart->font();
-    chartFont.setPointSize(fontSize);
-    m_chart->setFont(chartFont);
-    m_chart->legend()->setFont(chartFont);
-    m_xAxis->setLabelsFont(chartFont);
-    m_yAxis->setLabelsFont(chartFont);
-    // 轴标题放大（放在 setTitleVisible 附近即可）
-    QFont titleFont = m_xAxis->titleFont();
-    titleFont.setPointSize(fontSize);                 
-    m_xAxis->setTitleFont(titleFont);
-    m_yAxis->setTitleFont(titleFont);
-}   
-
-void ChartManager::Private::clearShow()
-{
-    for (auto series : m_targetSeries) series->clear();
-    for (auto series : m_actualSeries) series->clear();
-}
-
-void ChartManager::Private::stopShow()
-{
-    for (int i = 0; i < m_count; ++i) {
-        m_actualSeries[i]->setVisible(false);
-        m_targetSeries[i]->setVisible(false);
-    }
-}
-
-int ChartManager::Private::getMode() const
-{
-    return m_mode;
-}
-
-void ChartManager::Private::addData(int ch, float target, float actual)
-{
-    if (ch < 0 || ch >= m_count)    return;
-    m_storage->addData(ch, target, actual);  
-}
-
-void ChartManager::Private::addData(int ch, float target, float actual, qint64 timestamp)
-{
-    if (ch < 0 || ch >= m_count) return;
-    m_storage->addData(ch, target, actual, timestamp);   
-}
-
-void ChartManager::Private::addData(const QList<ChannelData>& dataNum)                           //添加一批数据
-{
-    if(!dataNum.size())     return;         // 空数据直接返回
-    m_storage->addData(dataNum);            // 添加数据
-}         
-
-void ChartManager::Private::importData(const QString& fileName)
-{
-    emit dataImport(fileName);
-}
-
-void ChartManager::Private::exportData(const QString& fileName, qint64 startTime, qint64 endTime)
-{
-    emit dataExport(fileName, startTime, endTime);
-}
-
-void ChartManager::Private::updateData()
-{   // 防止并发更新
-    // 并发保护：如果上一批数据更新任务尚未完成，则跳过本次触发。
-    // 这可以防止用户在快速缩放/平移时产生大量并发任务，导致系统过载。
-    // 连续操作时，只有最后一次触发会真正启动任务（因为中间触发时 m_isUpdating 为 true），
-    // 从而保证最终显示的是最新范围的数据，同时避免中间范围的无用计算。
-    // m_updateTotal++;
-    // if (m_isUpdating) { m_updateSkipped++; return; }
-    if (m_isUpdating)    return;
-    // 1. 检查是否有新数据
-    qint64 startTime, endTime;                        // 数据时间戳的范围
-    qint64 viewStart, viewEnd;
-    _getViewRange(viewStart, viewEnd);                // 直接获取对应模式下，所需的显示范围
-
-    if (m_baseTime == 0) 
-        m_baseTime = m_storage->getBaseTimestamp();   // 记录基准时间戳
-    
-    m_storage->getTimeRange(startTime, endTime);
-    if (endTime == m_endTime)       return;     // 无新数据，直接返回
-    m_endTime = endTime;
-    // 2. 构建任务列表
-    QList<SeriesTask> tasks;
-
-    for (int ch = 0; ch < m_count; ++ch) {
-        if (m_targetSeries[ch]->isVisible()) {
-            tasks.append({ch, true, viewStart, viewEnd, m_useAbsTime, POINT_THRESHOLD, false});
+    const int idx = controllers.size();
+    connect(ctrl, &ChartController::rangeChanged, this, [this, idx](double min, double max) {
+        if (idx < viewRanges.size()) {
+            viewRanges[idx]     = QPair<double,double>(min, max);
+            viewAutoFollow[idx] = false;            // 用户拖拽/缩放 -> 切手动
         }
-        if (m_actualSeries[ch]->isVisible()) {
-            tasks.append({ch, false, viewStart, viewEnd, m_useAbsTime, POINT_THRESHOLD, false});
-        }
-    }
-        
-    // 3. 并行处理所有任务
-    processTasksParallel(tasks, false);
-}
-
-void ChartManager::Private::updateAll()
-{  
-    // 停止定时器，避免干扰
-    m_timer->stop();
-
-    qint64 startTime, endTime;
-    m_storage->getTimeRange(startTime, endTime);
-    // 使用全量时间范围（0 表示全部）
-    QList<SeriesTask> tasks;
-    for (int ch = 0; ch < m_count; ++ch) {
-        // 实际值和目标值都使用 LTTB，默认阈值设为 3000点
-        tasks.append({ch, true, 0, 0, true,  LTTB_THRESHOLD, true});
-        tasks.append({ch, false, 0, 0, true, LTTB_THRESHOLD, true});
-    }
-
-    processTasksParallel(tasks, true);
-}
-
-void ChartManager::Private::do_XRangeChanged(qreal min, qreal max)
-{
-    if (m_mode != Mode_Auto) return;
-    qreal newMin = min;
-    qreal newMax = max;
-    bool needAdjust = false;
-
-    if (m_useAbsTime) {
-        if (min < 0) {
-            newMin = 0;
-            needAdjust = true;
-        }
-        if (newMax <= newMin) {
-            newMax = newMin + 1.0;
-            needAdjust = true;
-        }
-    } else {
-        if (max > 0) {
-            newMax = 0;
-            needAdjust = true;
-        }
-        if (newMin >= newMax) {
-            newMin = newMax - 1.0;
-            needAdjust = true;
-        }
-    }
-
-    if (needAdjust) {
-        m_xAxis->blockSignals(true);
-        m_xAxis->setRange(newMin, newMax);
-        m_xAxis->blockSignals(false);
-    }
-}
-
-void ChartManager::Private::do_exportFinished(bool success, const QString& message)
-{
-    emit m_manager->exportDataFinished(success, message);
-}
-
-void ChartManager::Private::do_importFinished(bool success, const QString& message)
-{
-    emit m_manager->importDataFinished(success, message);
-}
-
-// 辅助函数：查找可见曲线的 Y 范围
-static void _findMaxMin(const QList<QLineSeries*>& lineSeries, double& minY, double& maxY, bool& hasData, int maxPoints)
-{
-    for (auto series : lineSeries) {
-        if (!series->isVisible()) continue;
-        const auto& points = series->points();
-        int count = points.size();
-        if (count == 0) continue;
-        int startIdx = qMax(0, count - maxPoints);
-        for (int i = startIdx; i < count; ++i) {
-            double y = points[i].y();
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-            hasData = true;
-        }
-    }
-}
-
-void ChartManager::Private::_adjustYAxis(int num)
-{
-    if (m_mode != 0) return;
-    bool hasData = false;
-    double minY = std::numeric_limits<double>::max();
-    double maxY = std::numeric_limits<double>::lowest();
-
-    _findMaxMin(m_targetSeries, minY, maxY, hasData, num);
-    _findMaxMin(m_actualSeries, minY, maxY, hasData, num);
-
-    if (hasData && std::isfinite(minY) && std::isfinite(maxY)) {
-        double range = maxY - minY;
-        double margin = range * 0.05;
-        if (range < 1e-2) {
-            double center = minY;
-            m_yAxis->setRange(center - 0.5, center + 0.5);
-        } else {
-            m_yAxis->setRange(minY - margin, maxY + margin);
-        }
-    } else {
-        m_yAxis->setRange(-5, 5);
-    }
-}
-
-void ChartManager::Private::_setBackColor()
-{
-    if (m_color == Color_White) {
-        m_chart->setBackgroundBrush(QBrush(Qt::white));
-        m_xAxis->setLabelsColor(Qt::black);
-        m_yAxis->setLabelsColor(Qt::black);
-        m_xAxis->setLinePen(QPen(Qt::black));
-        m_yAxis->setLinePen(QPen(Qt::black));
-        m_xAxis->setGridLineColor(Qt::gray);
-        m_yAxis->setGridLineColor(Qt::gray);
-        m_chart->legend()->setLabelColor(Qt::black);
-    } else {
-        m_chart->setBackgroundBrush(QBrush(Qt::black));
-        m_xAxis->setLabelsColor(Qt::white);
-        m_yAxis->setLabelsColor(Qt::white);
-        m_xAxis->setLinePen(QPen(Qt::white));
-        m_yAxis->setLinePen(QPen(Qt::white));
-        m_xAxis->setGridLineColor(Qt::darkGray);
-        m_yAxis->setGridLineColor(Qt::darkGray);
-        m_chart->legend()->setLabelColor(Qt::white);
-    }
-}
-
-void ChartManager::Private::_getViewRange(qint64& viewStart, qint64& viewEnd) // 直接获取当前视图范围
-{
-    qint64 now = QDateTime::currentMSecsSinceEpoch();                       // 获取当前时间戳
-    qint64 base = m_storage->getBaseTimestamp();                            // 获取基准时间戳
-    if (base == -1){                                                        // 说明此时还没有接收到数据
-        viewStart = now;
-        viewEnd = now;
-        return;                                  
-    }
-    if (m_mode == Mode_Auto) {    // 自动模式
-        viewStart = now - m_timewindow * 1000;
-        viewEnd = now;
-    } else {                      // 手动模式
-        qreal minX = m_xAxis->min();
-        qreal maxX = m_xAxis->max();
-
-        if (m_useAbsTime) {
-            viewStart = base + qint64(minX * 1000.0);
-            viewEnd   = base + qint64(maxX * 1000.0);
-        } else {
-            viewStart = now + qint64(minX * 1000.0);
-            viewEnd   = now + qint64(maxX * 1000.0);
-        }
-        // 确保时间顺序,并限制最大窗口时间
-        if (viewStart > viewEnd) std::swap(viewStart, viewEnd);
-        qint64 windowLen = viewEnd - viewStart;
-        if (windowLen > MAX_WINDOW_MS) {
-            viewStart = viewEnd - MAX_WINDOW_MS;
-            // 注意：不修改 X 轴范围，保持用户当前的缩放
-        }
-    }
-}
-
-void ChartManager::Private::updateTimerPeriod()
-{
-    //自动模式与手动模式下，窗口的刷新频率都会自动调整
-    qint64 viewStart, viewEnd;
-    _getViewRange(viewStart, viewEnd);
-    qint64 viewRange = (viewEnd - viewStart)/1000; //获取窗口范围
-    int multiplier = 1;
-
-    if (viewRange <= WINDOW_TIME_I) {           // ≤5分钟
-        multiplier = PERIOD_MUL_I;
-    } else if (viewRange <= WINDOW_TIME_II) {   // 5~15分钟
-        multiplier = PERIOD_MUL_II;
-    } else if (viewRange <= WINDOW_TIME_III) {  // 15~30分钟
-        multiplier = PERIOD_MUL_III;
-    } else if (viewRange <= WINDOW_TIME_VI) {   // 30~60分钟
-        multiplier = PERIOD_MUL_VI;
-    } else {                                    // >60分钟
-        multiplier = PERIOD_MUL_VI;
-    }
-
-    int period = m_period * multiplier;           // 基础周期 * 倍数
-    if (m_timer && m_timer->isActive()) {         // 下个定时周期起作用
-        m_timer->setInterval(period);
-    }
-}
-
-void ChartManager::Private::processTasksParallel(const QList<SeriesTask>& tasks, bool isUpdateAll)
-{
-    if (tasks.isEmpty()) return;
-    // 标记更新开始
-    //m_taskStarted++;
-    m_isUpdating = true;
-    QFuture<SeriesResult> future = QtConcurrent::mapped(tasks, [this](const SeriesTask& task) -> SeriesResult {
-    
-        // 在工作线程中调用 DataStorage 获取点列表
-        QList<QPointF>* points = m_storage->getPointNum(task.channel, task.viewStart, task.viewEnd,
-                                                        task.isAbs, task.isTarget, task.threshold,
-                                                        task.useLTTB);
-        return SeriesResult{task.channel, points, task.isTarget};
+        m_forceRefresh = true;   // 用户拖拽/缩放：强制按新范围重绘
+        updateData();
     });
 
-    // 使用 QFutureWatcher 异步等待完成
-    QFutureWatcher<SeriesResult>* watcher = new QFutureWatcher<SeriesResult>(this);
-    m_activeWatcher = watcher; // 存储
-    connect(watcher, &QFutureWatcher<SeriesResult>::finished, this, [this, watcher, isUpdateAll]() {
-        QList<SeriesResult> results = watcher->future().results();
-        onAllResultsReady(results);
-        watcher->deleteLater();
-        m_activeWatcher = nullptr;
-        if (isUpdateAll) {
-            // 如果是 updateAll，还需要恢复定时器等操作
-            finishUpdateAll();
+    controllers.append(ctrl);
+    viewChannels.append(QList<int>());
+    viewTypes.append(type);
+    viewRanges.append(QPair<double,double>(0.0, m_windowLen));
+    viewAutoFollow.append(true);
+    viewAbsTime.append(false);
+    viewBackColor.append(0);
+    ctrl->setBackColor(Qt::white);
+    return idx;
+}
+
+void ChartManager::Private::removeView(int viewIndex)
+{
+    if (viewIndex == -1) {
+        // 移除所有视图（从后往前删，下标不失效）
+        for (int i = controllers.size() - 1; i >= 0; --i)
+            removeView(i);
+        return;
+    }
+    if (viewIndex < 0 || viewIndex >= controllers.size()) return;
+    delete controllers[viewIndex];
+    controllers.removeAt(viewIndex);
+    viewChannels.removeAt(viewIndex);
+    viewTypes.removeAt(viewIndex);
+    viewRanges.removeAt(viewIndex);
+    viewAutoFollow.removeAt(viewIndex);
+    viewAbsTime.removeAt(viewIndex);
+    viewBackColor.removeAt(viewIndex);
+}
+
+QWidget* ChartManager::Private::getViewWidget(int viewIndex) const
+{
+    if (viewIndex < 0 || viewIndex >= controllers.size()) return nullptr;
+    return controllers[viewIndex]->getWidget();
+}
+
+// ====== 通道绑定（每个视图一份订阅列表，通道可跨视图共享） ======
+void ChartManager::Private::attachChannel(int viewIndex, int channel)
+{
+    if (viewIndex < 0 || viewIndex >= controllers.size())   return;
+    if (channel < 0 || channel >= m_channelCount)           return;
+    if (viewChannels[viewIndex].contains(channel))          return;
+    viewChannels[viewIndex].append(channel);
+    controllers[viewIndex]->addChannel(channel, m_channelNames[channel]);
+    if (viewTypes[viewIndex] == View_XY)
+        controllers[viewIndex]->setXYChannels(viewChannels[viewIndex]);
+    m_forceRefresh = true;
+    updateData();
+}
+
+void ChartManager::Private::detachChannel(int viewIndex, int channel)
+{
+    if (viewIndex < 0 || viewIndex >= controllers.size()) return;
+    viewChannels[viewIndex].removeAll(channel);
+    controllers[viewIndex]->removeChannel(channel);
+    if (viewTypes[viewIndex] == View_XY)
+        controllers[viewIndex]->setXYChannels(viewChannels[viewIndex]);
+    m_forceRefresh = true;
+    updateData();
+}
+
+void ChartManager::Private::setViewChannels(int viewIndex, const QList<int>& channels)
+{
+    if (viewIndex < 0 || viewIndex >= controllers.size()) return;
+    viewChannels[viewIndex].clear();
+    for (int ch : channels) {
+        if (ch >= 0 && ch < m_channelCount)
+            viewChannels[viewIndex].append(ch);
+    }
+    controllers[viewIndex]->setChannels(viewChannels[viewIndex]);
+    for (int ch : viewChannels[viewIndex])
+        controllers[viewIndex]->setChannelName(ch, m_channelNames[ch]);   // 新建曲线也带当前通道名
+    m_forceRefresh = true;
+    updateData();
+}
+
+QList<int> ChartManager::Private::getViewChannels(int viewIndex) const
+{
+    if (viewIndex < 0 || viewIndex >= viewChannels.size()) return QList<int>();
+    return viewChannels[viewIndex];
+}
+
+// ====== 通道控制（全局生效，应用到所有视图） ======
+void ChartManager::Private::setChannelName(int channel, const QString& name)
+{
+    if (channel >= 0 && channel < m_channelNames.size())
+        m_channelNames[channel] = name;                  // 记录通道名，导出列名用
+    for (ChartController *ctrl : controllers)
+        ctrl->setChannelName(channel, name);
+    m_forceRefresh = true;   // 外观变化：下个刷新周期重绘
+}
+
+void ChartManager::Private::setChannelColor(int channel, const QColor& color)
+{
+    for (ChartController *ctrl : controllers)
+        ctrl->setChannelColor(channel, color);
+    m_forceRefresh = true;   // 外观变化：下个刷新周期重绘
+}
+
+void ChartManager::Private::setChannelVisible(int channel, bool visible)
+{
+    for (ChartController *ctrl : controllers)
+        ctrl->setChannelVisible(channel, visible);
+    m_forceRefresh = true;   // 可见性变化：下个刷新周期重绘
+}
+
+// ====== 坐标轴 ======
+void ChartManager::Private::setViewRange(int viewIndex, double startTime, double endTime)
+{
+    if (viewIndex < 0 || viewIndex >= controllers.size()) return;
+    viewRanges[viewIndex]     = QPair<double,double>(startTime, endTime);
+    viewAutoFollow[viewIndex] = false;
+    controllers[viewIndex]->setXRange(startTime, endTime);
+    m_forceRefresh = true;
+    updateData();
+}
+
+void ChartManager::Private::setAbsTime(int viewIndex, bool enabled)
+{
+    if (viewIndex < 0 || viewIndex >= viewAbsTime.size()) return;
+    viewAbsTime[viewIndex] = enabled;
+    m_forceRefresh = true;
+    updateData();
+}
+
+void ChartManager::Private::setBackColor(int viewIndex, int color)
+{
+    if (viewIndex < 0 || viewIndex >= viewBackColor.size()) return;
+    viewBackColor[viewIndex] = color;
+    controllers[viewIndex]->setBackColor(color == 0 ? Qt::white : Qt::black);
+    m_forceRefresh = true;   // 外观变化：下个刷新周期重绘
+}
+
+// ====== 每轮更新：窗口 -> 去重取数（异步） -> 广播 ======
+void ChartManager::Private::updateData()
+{
+    if (isUpdating || isImporting) return;        // 上一批未完成或导入中，跳过（并发保护）
+    isUpdating = true;
+
+    // 1. 可见通道去重 + 频谱通道集合（频谱视图绑定的通道）
+    QList<int> channels;
+    QList<int> fftChannels;
+    for (int vi = 0; vi < viewChannels.size(); ++vi) {
+        const bool isSpec = (viewTypes[vi] == View_Spectrum || viewTypes[vi] == View_WaveformSpectrum);
+        for (int ch : viewChannels[vi]) {
+            if (!channels.contains(ch))
+                channels.append(ch);
+            if (isSpec && !fftChannels.contains(ch))
+                fftChannels.append(ch);
         }
+    }
+    if (channels.isEmpty()) { isUpdating = false; return; }
+
+    // 无新数据且非强制刷新（拖拽/换通道/停显等）则跳过，省一次并行取数与重绘
+    if (!m_forceRefresh && m_storage->dataVersion() == m_lastVersion) {
+        isUpdating = false;
+        return;
+    }
+    m_forceRefresh = false;
+    m_lastVersion  = m_storage->dataVersion();
+
+    // 2. 全局窗口：优先手动视图范围，否则自动跟随最新
+    double start = -1.0, end = -1.0;            // <0 表示取全部
+    for (int i = 0; i < viewRanges.size(); ++i) {
+        if (!viewAutoFollow[i]) {
+            start = viewRanges[i].first;
+            end   = viewRanges[i].second;
+            break;
+        }
+    }
+    if (start < 0.0 || end < 0.0) {
+        if (m_latest > 0.0) {
+            start = m_latest - m_windowLen;
+            end   = m_latest;
+        }
+        // m_latest <= 0：首轮取全部数据引导，结果回填 m_latest
+    }
+
+    // 3. 启动异步并行取数（线程池执行，主线程不被阻塞）
+    const double winStart = start, winEnd = end;
+    QFuture<ParallelResult> future = QtConcurrent::mapped(
+        channels, [this, winStart, winEnd, fftChannels](int ch) -> ParallelResult {
+            ParallelResult res;
+            res.data     = m_storage->getData(ch, winStart, winEnd, m_threshold, /*isLTTB*/ false);
+            res.spectrum = nullptr;
+            if (fftChannels.contains(ch)) {
+                computeFFTInto(m_fftBufs[ch], ch, m_nfft);   // 频谱计算也在并行任务中
+                res.spectrum = &m_fftBufs[ch];
+            }
+            return res;
+        });
+
+    // 4. QFutureWatcher 异步收尾：完成后再广播，主线程零阻塞
+    QFutureWatcher<ParallelResult> *watcher = new QFutureWatcher<ParallelResult>(this);
+    m_activeWatcher = watcher;
+    connect(watcher, &QFutureWatcher<ParallelResult>::finished, this, [this, watcher]() {
+        broadcastResults(watcher->future().results());   // finished 后 results() 不阻塞
+        watcher->deleteLater();
+        if (m_activeWatcher == watcher) m_activeWatcher = nullptr;
     });
     watcher->setFuture(future);
 }
 
-void ChartManager::Private::onAllResultsReady(const QList<SeriesResult>& results)
+// ====== 结果就绪（主线程）：零拷贝广播到所有订阅视图 ======
+void ChartManager::Private::broadcastResults(const QList<ParallelResult>& results)
 {
-    // 禁用视图更新，避免中间状态重绘
-    if (m_chartView) m_chartView->setUpdatesEnabled(false);
+    QHash<int, QList<double>> shiftedX;      // 相对时间：每通道只平移一次，多视图共享
 
-    // 更新所有曲线
-    for (const auto& result : results) {
-        if(!result.points)      continue;         //判空
-        QLineSeries* series = result.isTarget ? m_targetSeries[result.channel] : m_actualSeries[result.channel];
-        series->replace(*result.points);
-    }
-    
-    // 更新坐标轴（根据模式）
-    if (m_mode == Mode_Auto) {
-        qint64 now = QDateTime::currentMSecsSinceEpoch();
-        qint64 base = m_storage->getBaseTimestamp();
-        if (m_useAbsTime) {
-            qreal minX = (now - m_timewindow * 1000.0 - base) / 1000.0;
-            qreal maxX = (now - base) / 1000.0;
-            m_xAxis->setRange(minX, maxX);
-        } else {
-            m_xAxis->setRange(-m_timewindow, 0);
+    for (const ParallelResult &r : results) {
+        ChannelData *data = r.data;
+        if (!data || data->times.isEmpty())   continue;
+
+        // 时间戳单调递增：last 即该通道最新时间，下标访问即可得范围
+        m_latest = qMax(m_latest, data->times.last());
+
+        // ChannelData 自带 channel，直接按它广播，无需哈希
+        for (int vi = 0; vi < controllers.size(); ++vi) {
+            if (viewTypes[vi] == View_Spectrum)   continue;   // 纯频谱视图只收频谱，不画波形
+            if (!viewChannels[vi].contains(data->channel))   continue;
+            ChartController *ctrl = controllers[vi];
+            if (!viewAbsTime[vi]) {
+                // 相对时间：同一通道的平移 X 只算一次，其余视图直接复用
+                QList<double> &x = shiftedX[data->channel];
+                if (x.isEmpty()) {
+                    x = data->times;                          // 共享缓冲不能就地改，拷贝一份
+                    double maxX = x.last();
+                    for (double &t : x) t -= maxX;
+                }
+                ctrl->updateData(data->channel, x, data->values);
+            } else {
+                // 绝对时间：直接传内部缓冲（隐式共享，零拷贝）
+                ctrl->updateData(data->channel, data->times, data->values);
+            }
         }
-        _adjustYAxis(POINT_THRESHOLD);
     }
-    // 手动模式下保持用户缩放，无需自动调整 X 轴
-    // 但需要限制最大窗口（已在 flushChartView 中处理，这里可省略）
-    // 重新启用视图更新并强制刷新
-    if (m_chartView) {
-        m_chartView->setUpdatesEnabled(true);
-        m_chartView->update();
+
+    // 频谱视图：取绑定通道的频谱缓冲，零拷贝广播（多视图共享同一份）
+    for (const ParallelResult &r : results) {
+        if (!r.spectrum || r.spectrum->times.isEmpty())   continue;
+        const int ch = r.spectrum->channel;
+        for (int vi = 0; vi < controllers.size(); ++vi) {
+            if (viewTypes[vi] != View_Spectrum && viewTypes[vi] != View_WaveformSpectrum)  continue;
+            if (!viewChannels[vi].contains(ch))   continue;
+            controllers[vi]->updateSpectrum(r.spectrum->times, r.spectrum->values);
+        }
     }
-    // 所有更新完成，重置标志
-    m_isUpdating = false;
+
+    for (ChartController *ctrl : controllers)
+        ctrl->replotQueued();
+
+    isUpdating = false;
 }
 
-void ChartManager::Private::finishUpdateAll()
-{   // 重新启动定时器
-    if (m_timer->isActive()) m_timer->start(); // 如果之前是启动状态
+// ====== FFT：数据取自模型最近窗口，采样率由时间轴估算 ======
+// 同步接口（一次性/分析用）；频谱显示走 updateData 并行管线，不占 UI 线程
+ChannelData ChartManager::Private::computeFFT(int channel, int nfft)
+{
+    ChannelData out;
+    computeFFTInto(out, channel, nfft);
+    return out;
 }
 
-// ========== ChartManager 公共接口实现 ==========
-ChartManager::ChartManager(int channelCount, QObject *parent) : QObject(parent), 
-    pimpl(new Private(channelCount, this)){}
-ChartManager::~ChartManager(){};                //Qt负责内存管理
+// 取最近 nfft 个点 -> 平均采样率 -> 汉宁窗 -> 原地 FFT -> 线性幅值谱，结果写 out
+void ChartManager::Private::computeFFTInto(ChannelData &out, int channel, int nfft)
+{
+    if (channel < 0 || channel >= m_channelCount || nfft <= 0) return;
 
-void ChartManager::start()                      { pimpl->start();}
-void ChartManager::stop()                       { pimpl->stop(); }
-void ChartManager::setPeriod(int ms)            { pimpl->setPeriod(ms); }
-void ChartManager::setChannelVisible(int channel, bool targetVisible, bool actualVisible) { pimpl->setChannelVisible(channel, targetVisible, actualVisible); }
-void ChartManager::setMode(int mode)            { pimpl->setMode(mode); }
-void ChartManager::setAbsTime(bool isAbs)       { pimpl->setAbsTime(isAbs); }
-void ChartManager::setBackColor(int color)      { pimpl->setBackColor(color); }
-void ChartManager::setLegendName(int ch, const QString& target, const QString& actual)  { pimpl->setLegendName(ch, target, actual);}
-void ChartManager::setChartView(ChartView *chartView)   { pimpl->setChartView(chartView); }
-void ChartManager::setWindowTime(int windowTime){ pimpl->setWindowTime(windowTime); }
-void ChartManager::clearShow()                  { pimpl->clearShow(); }
-void ChartManager::stopShow()                   { pimpl->stopShow(); }
-int ChartManager::getMode() const               { return pimpl->getMode(); }
-void ChartManager::addData(int ch, float target, float actual) { pimpl->addData(ch, target, actual); }
-void ChartManager::addData(int ch, float target, float actual, qint64 timestamp) { pimpl->addData(ch, target, actual, timestamp);}
-void ChartManager::addData(const QList<ChannelData>& dataNum) { pimpl->addData(dataNum);}
-void ChartManager::importData(const QString& fileName) { pimpl->importData(fileName); }
-void ChartManager::exportData(const QString& fileName, qint64 startTime, qint64 endTime) { pimpl->exportData(fileName, startTime, endTime); }
-void ChartManager::updateData()                 { pimpl->updateData(); }
-void ChartManager::updateAll()                  { pimpl->updateAll(); }
+    // FFT 点数向下取整到 2 的幂（radix-2），同时保证不截断最近数据
+    int N = 1;
+    while ((N << 1) <= nfft)  N <<= 1;
+    if (N < 4) return;
+
+    ChannelData raw = m_storage->getData(channel, N);   // 实时窗口：最近 N 个点
+    if (raw.times.size() < 4) return;
+    const int n = raw.times.size();
+
+    // 平均采样频率：由相邻时间戳间隔的平均值估算（fs = (n-1) / ΣΔt）
+    double rate_N = 1.0;            // rate/N, 预计算常量，减少后续运算开销
+    double dtSum = 0.0;
+    for (int i = 1; i < n; ++i)
+        dtSum += raw.times[i] - raw.times[i - 1];
+    if (dtSum > 0.0)
+        rate_N = (n - 1) / dtSum / N;
+
+    // 汉宁窗：抑制频谱泄漏；相干增益 0.5，乘 2 补偿，峰值幅度与矩形窗一致
+    const double _2_PI = 2.0 * std::acos(-1.0);
+    for (int i = 0; i < n; ++i) {
+        const double w = 0.5 * (1.0 - std::cos(_2_PI * i / (n - 1)));
+        raw.values[i] *= w * 2.0;
+    }
+
+    fft_real(raw.values, raw.times, N);                         // 原地 FFT：复用 raw.times 作虚部，不额外分配内存
+
+    out.channel = channel;
+    out.times.resize(N / 2);
+    out.values.resize(N / 2);
+    for (int i = 0; i < N / 2; ++i) {
+        out.times[i]  = i * rate_N;
+        out.values[i] = raw.values[i];                          // 线性幅值（无参考幅值，不做 dB）
+    }
+}
+
+// ====== 导入导出 ======
+void ChartManager::Private::exportData(const QString& fileName, double durationSeconds)
+{
+    // 按 durationSeconds 决定取数窗口：>0 取最近 N 秒，否则全量（-1 表示全部）
+    double start = -1.0, end = -1.0;
+    if (durationSeconds > 0.0 && m_latest > 0.0) {
+        start = m_latest - durationSeconds;
+        end   = m_latest;
+    }
+    emit dataExport(fileName, start, end, m_channelNames);   // 异步：DataExporter 在工作线程执行
+}
+
+void ChartManager::Private::do_exportFinished(bool success, const QString& message)
+{
+    emit m_manager->exportFinished(success, message);
+}
+
+void ChartManager::Private::importData(const QString& fileName)
+{
+    // 丢弃在途的并行刷新批次：导入完成后不再广播过期数据
+    if (m_activeWatcher) {
+        disconnect(m_activeWatcher, nullptr, this, nullptr);
+        m_retiredWatchers.append(m_activeWatcher); // 任务仍会跑完，析构时统一等待，不能 deleteLater
+        m_activeWatcher = nullptr;
+    }
+    isUpdating = false;                            // 清掉遗留标志，避免后续刷新被误丢弃
+    isImporting = true;                            // 导入期间禁止任何刷新（含直接 updateData 调用）
+
+    // 导入期间暂停定时刷新：避免读到半成品数据，完成后恢复
+    m_timer->stop();
+
+    // 导入前清空所有通道：旧缓冲不再有意义；时间轴重新锚定，视图跟随导入数据
+    for (int ch = 0; ch < m_channelCount; ++ch)
+        m_storage->resetData(ch);
+    m_latest = -1.0;                               // 重置默认时间戳。
+    emit dataImport(fileName);                     // 异步：DataImporter 在工作线程执行
+}
+
+void ChartManager::Private::do_importFinished(bool success, const QString& message)
+{
+    isImporting = false;
+    m_timer->start();                              // 导入完成，恢复刷新
+    emit m_manager->importFinished(success, message);
+}
+
+void ChartManager::Private::do_importNames(const QStringList& names)
+{
+    const int n = qMin(names.size(), m_channelCount);
+    for (int ch = 0; ch < n; ++ch) {
+        const QString name = names[ch].trimmed();
+        if (name.isEmpty())  continue;            // 空列名不覆盖现有命名
+        setChannelName(ch, name);                 // 更新图例名与导出列名
+    }
+}
+
+// ====== 其他 ======
+void ChartManager::Private::clearShow()
+{
+    for (ChartController *ctrl : controllers)
+        ctrl->clearData();                  // 清数据不清图形：下轮刷新自动恢复
+}
+
+void ChartManager::Private::stopShow()
+{
+    // 停止显示：所有曲线不可见，含频谱/XY（数据保留；start/stop 控制刷新）
+    for (ChartController *ctrl : controllers)
+        ctrl->setViewVisible(false);
+    m_forceRefresh = true;
+    updateData();                           // 立即按隐藏状态重绘，无需等新数据
+}
+
+// ============================================================
+// 简单原地 FFT：实数输入，结果以幅度谱写回原数组
+// n 为 2 的幂（computeFFT 已保证），数据不足自动补零
+// ============================================================
+static void fft_real(QList<double>& re, QList<double>& im, int n)
+{
+    const int N = n;
+    re.resize(N);                                  // 不足补零
+    im.resize(N);
+    im.fill(0.0);                                  // 虚部工作区（复用调用方数组，如 raw.times）
+
+    // 1. 位反转重排
+    for (int i = 1, j = 0; i < N; ++i) {
+        int bit = N >> 1;
+        for (; j & bit; bit >>= 1)  j ^= bit;
+        j ^= bit;
+        if (i < j)  qSwap(re[i], re[j]);
+    }
+
+    // 2. 蝶形运算
+    const double _2_PI = 2.0 * std::acos(-1.0);
+    for (int len = 2; len <= N; len <<= 1) {
+        const double ang = -_2_PI / len;
+        const double wRe = std::cos(ang), wIm = std::sin(ang);
+        const int half = len >> 1;
+        for (int i = 0; i < N; i += len) {
+            double curRe = 1.0, curIm = 0.0;
+            for (int k = 0; k < half; ++k) {
+                const double uRe = re[i + k],        uIm = im[i + k];
+                const double vRe = re[i + k + half] * curRe - im[i + k + half] * curIm;
+                const double vIm = re[i + k + half] * curIm + im[i + k + half] * curRe;
+                re[i + k]            = uRe + vRe;
+                im[i + k]            = uIm + vIm;
+                re[i + k + half]     = uRe - vRe;
+                im[i + k + half]     = uIm - vIm;
+                const double nRe = curRe * wRe - curIm * wIm;
+                curIm = curRe * wIm + curIm * wRe;
+                curRe = nRe;
+            }
+        }
+    }
+
+    // 3. 幅度谱：实数输入后半段是前半段的镜像，只需算 [0, N/2]，再镜像补全
+    re[0] = std::sqrt(re[0] * re[0] + im[0] * im[0]);          // DC bin
+    for (int i = 1; i <= N / 2; ++i) {
+        const double mag = std::sqrt(re[i] * re[i] + im[i] * im[i]);
+        re[i]     = mag;
+        re[N - i] = mag;                                       // 镜像 bin
+    }
+}
+
+// ============================================================
+// ChartManager 公共接口
+// ============================================================
+ChartManager::ChartManager(int channelCount, QObject *parent)
+    : QObject(parent)
+    , pimpl(new Private(channelCount, this)) {}
+
+ChartManager::~ChartManager() = default;
+
+void ChartManager::start()                       { pimpl->start(); }
+void ChartManager::stop()                        { pimpl->stop(); }
+void ChartManager::setPeriod(int ms)             { pimpl->setPeriod(ms); }
+
+void ChartManager::addData(int channel, double value)                    { pimpl->addData(channel, value); }
+void ChartManager::addData(int channel, double time, double value)       { pimpl->addData(channel, time, value); }
+void ChartManager::addData(const QList<ChannelData>& dataList)           { pimpl->addData(dataList); }
+
+int  ChartManager::createView(ViewType type)     { return pimpl->createView(type); }
+void ChartManager::removeView(int viewIndex)     { pimpl->removeView(viewIndex); }
+void ChartManager::attachChannel(int viewIndex, int channel)             { pimpl->attachChannel(viewIndex, channel); }
+void ChartManager::detachChannel(int viewIndex, int channel)             { pimpl->detachChannel(viewIndex, channel); }
+void ChartManager::setViewChannels(int viewIndex, const QList<int>& channels) { pimpl->setViewChannels(viewIndex, channels); }
+QList<int> ChartManager::getViewChannels(int viewIndex) const            { return pimpl->getViewChannels(viewIndex); }
+QWidget* ChartManager::getViewWidget(int viewIndex) const                { return pimpl->getViewWidget(viewIndex); }
+
+void ChartManager::setChannelName(int channel, const QString& name)      { pimpl->setChannelName(channel, name); }
+void ChartManager::setChannelColor(int channel, const QColor& color)     { pimpl->setChannelColor(channel, color); }
+void ChartManager::setChannelVisible(int channel, bool visible)          { pimpl->setChannelVisible(channel, visible); }
+
+void ChartManager::setViewRange(int viewIndex, double startTime, double endTime) { pimpl->setViewRange(viewIndex, startTime, endTime); }
+void ChartManager::setAbsTime(int viewIndex, bool enabled)               { pimpl->setAbsTime(viewIndex, enabled); }
+void ChartManager::setBackColor(int viewIndex, int color)                { pimpl->setBackColor(viewIndex, color); }
+
+ChannelData ChartManager::computeFFT(int channel, int nfft)              { return pimpl->computeFFT(channel, nfft); }
+void ChartManager::exportData(const QString& fileName, double durationSeconds) { pimpl->exportData(fileName, durationSeconds); }
+void ChartManager::importData(const QString& fileName)                   { pimpl->importData(fileName); }
+
+void ChartManager::clearShow()                   { pimpl->clearShow(); }
+void ChartManager::stopShow()                    { pimpl->stopShow(); }

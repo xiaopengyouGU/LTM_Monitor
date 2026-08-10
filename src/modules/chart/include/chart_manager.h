@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QString>
+#include <QColor>
+#include <QList>
 // 为动态库添加导出宏！！！
 // chart_manager.h
 #if defined(CHART_LIBRARY)
@@ -11,94 +13,86 @@
 #  define CHART_EXPORT Q_DECL_IMPORT
 #endif
 
-typedef enum{
+typedef enum {
     Color_White = 0,
     Color_Black,                    
 }WindowColor;
 
-typedef enum{
-    Mode_Auto = 0,                  // 自动模式
-    Mode_Hand,                      // 手动模式,1
+typedef enum {
+    Mode_Auto = 0,          // 自动模式
+    Mode_Hand,              // 手动模式,1
 }ShowMode;
 
-// 环形缓冲区数据结构（也是通道数据）
-class ChannelData {
-public:
-    QList<float> target;      // 目标值列表
-    QList<float> actual;      // 实际值列表
-    QList<qint64> timestamp;  // 时间戳列表
-    int head;                 // 环形缓冲区写指针
-    int count;                // 当前有效数据点数
-    ChannelData() : head(0), count(0) {}
+typedef enum {              // 视图类型
+    View_Waveform,          // 波形视图：显示通道的时域曲线，支持多通道叠加和多坐标轴
+    View_Spectrum,          // 频谱视图：显示单通道的FFT频谱（单轴）
+    View_WaveformSpectrum,  // 波形+频谱：上下分栏，上波形下频谱，通道同步
+    View_XY                 // XY图：通道A为X轴，通道B为Y轴
+}ViewType;
+
+// 用户侧和内部存储（环形缓冲区）共用同一个结构体
+struct ChannelData {
+    int channel;            // 通道号（必填）
+    QList<double> times;    // 时间轴（必填）
+    QList<double> values;   // 数值  （必填）
+    int head;               // 读指针 （内部维护）
+    int count;              // 数据长度（内部维护）
 };
 
-// 通道曲线颜色定义数组
-// const QColor targetColors[10] = {
-//     Qt::red,                     // 红
-//     QColor(255, 128, 0),         // 橙
-//     Qt::magenta,                 // 品红
-//     Qt::blue,                    // 蓝
-//     Qt::darkBlue,                // 深蓝
-//     QColor(128, 0, 128),         // 紫
-//     QColor(255, 192, 203),       // 粉
-//     QColor(139, 69, 19),         // 棕
-//     QColor(128, 128, 0),         // 橄榄绿
-//     QColor(75, 0, 130)           // 靛蓝
-// };
 
-// const QColor actualColors[10] = {
-//     Qt::green,                   // 绿
-//     Qt::yellow,                  // 黄
-//     Qt::darkGreen,               // 深绿
-//     Qt::cyan,                    // 青
-//     Qt::darkYellow,              // 深黄
-//     QColor(144, 238, 144),       // 浅绿
-//     QColor(255, 165, 0),         // 橙（与目标值橙色不同）
-//     QColor(138, 43, 226),        // 紫罗兰
-//     QColor(135, 206, 235),       // 天蓝
-//     QColor(255, 127, 80)         // 珊瑚
-// };
-
-
-class ChartView;
-
-//不支持动态切换通道数，也没必要
-class CHART_EXPORT ChartManager : public QObject {
+class ChartManager : public QObject {
     Q_OBJECT
 public:
-    explicit ChartManager(int channelCount = 5, QObject *parent = nullptr); // 默认支持5个通道
+    // ====== 生命周期 ======
+    explicit ChartManager(int channelCount = 10, QObject *parent = nullptr);
     ~ChartManager();
-    void start();                                           // 启动图表管理器
-    void stop();                                            // 停止图表管理器
-    void setPeriod(int ms);                                 // 设置图表更新周期(单位ms),默认100ms
-    // 图表显示相关操作接口
-    void setChannelVisible(int channel, bool targetVisible, bool actualVisible);
-    void setLegendName(int channel, const QString& target, const QString& actual);  //复用通道，减少内存开销
-    void setWindowTime(int time_s);                         // 设置自动模式窗口的长度：单位s
-    void setMode(int mode);                                 // 0:自动模式， 1:手动模式
-    void setAbsTime(bool isAbs);
-    void setBackColor(int color);                           // 设置图表背景色
-    void clearShow();                                       // 一键清空显示
-    void stopShow();                                        // 一键停止显示
-    int  getMode() const;                                   // 获取当前模式
-    void setChartView(ChartView* chartView);                // 绑定视图对象
 
-    // 数据操作相关接口
-    void addData(int channel, float target, float actual);  // 添加一个数据
-    void addData(int channel, float target, float actual, qint64 timestamp);
-    void addData(const QList<ChannelData>& dataNum);        // 添加一批数据
-    void importData(const QString& fileName);               // 导入数据, 会覆盖原始数据，请先保存
-    void exportData(const QString& fileName, qint64 startTime, qint64 endTime);
-    void updateData();                                      // 用户可以手动更新数据
-    void updateAll();                                       // 显示所有数据，采用LTTB降采样
+    void start();           // 启动图表
+    void stop();            // 停止图表
+    void setPeriod(int ms); // 刷新周期（ms），默认100
+
+    // ====== 数据写入，时间戳必须单调递增 ======
+    void addData(int channel, double value);                    // 自动打时间戳（实时采集）
+    void addData(int channel, double time, double value);       // 用户指定时间戳（导入/回放）
+    void addData(const QList<ChannelData>& dataList);           // 批量导入
+
+    // ====== 视图管理 ======
+    int  createView(ViewType type);                             // 创建视图，返回视图索引
+    void removeView(int viewIndex);                             // viewIndex=-1，移除所有视图                             // viewIndex=-1,移除所有视图
+    void attachChannel(int viewIndex, int channel);             // 把通道显示到指定视图
+    void detachChannel(int viewIndex, int channel);
+    void setViewChannels(int viewIndex, const QList<int>& channels);
+    QList<int> getViewChannels(int viewIndex) const;            // 返回视图对应的所有通道
+    QWidget* getViewWidget(int viewIndex) const;                // 获取视图控件，供用户放置
+
+    // ====== 通道控制 ======
+    void setChannelName(int channel, const QString& name);      // 通道图例名，同时影响导出列名
+    void setChannelColor(int channel, const QColor& color);     // 设置通道颜色
+    void setChannelVisible(int channel, bool visible);          // 设置通道可见性
+
+    // ====== 坐标轴 ======
+    void setViewRange(int viewIndex, double startTime, double endTime); // 设置X轴范围
+    void setAbsTime(int viewIndex, bool enabled);               // true=绝对时间，false=相对时间
+    void setBackColor(int viewIndex, int color);                // 0=白，1=黑
+
+    // ====== FFT ======
+    ChannelData computeFFT(int channel, int nfft = 1024);       // 返回频谱（频率, 线性幅值）
+
+    // ====== 导入导出 ======
+    void exportData(const QString& fileName, double durationSeconds = -1.0); // -1=全量导出
+    void importData(const QString& fileName);
+
+    // ====== 其他 ======
+    void clearShow();   // 清空显示
+    void stopShow();    // 停止显示：所有通道不可见（数据保留）
 
 signals:
-    void exportDataFinished(bool success, const QString& message);
-    void importDataFinished(bool success, const QString& message);
-
+    void exportFinished(bool success, const QString& message);
+    void importFinished(bool success, const QString& message);
 private:
     class Private;
-    Private     *pimpl;
+    Private *pimpl;
 };
+
 
 #endif // CHART_MANAGER_H__

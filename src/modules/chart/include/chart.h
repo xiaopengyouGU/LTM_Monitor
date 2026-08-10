@@ -1,5 +1,4 @@
 #pragma once
 
-#include "chart_view.h"
+// 图表模块公共头（聚合入口）：对外只暴露 ChartManager 公共 API
 #include "chart_manager.h"
-// ... 其他公共头文件

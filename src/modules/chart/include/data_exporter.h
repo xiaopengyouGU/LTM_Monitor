@@ -2,6 +2,7 @@
 #define __DATA_EXPORTER_H__
 
 #include <QObject>
+#include <QStringList>
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -19,7 +20,7 @@ public:
         if(!m_storage) qDebug("DataImporter: storage is nullptr"); }
 
 public slots:
-    void do_dataExport(const QString& fileName, qint64 startTime, qint64 endTime);
+    void do_dataExport(const QString& fileName, double startTime, double endTime, const QStringList& nameList);
 
 signals:
     void exportFinished(bool success, const QString& message);

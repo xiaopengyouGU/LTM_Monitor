@@ -2,9 +2,6 @@
 #define DATA_STORAGE_H__
 
 #include <QObject>
-#include <QLineSeries>
-#include <QList>
-#include <QMutex>
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -12,28 +9,27 @@
 #  define CHART_EXPORT Q_DECL_IMPORT
 #endif
 
-class ChannelData;
+struct ChannelData;
 
 class CHART_EXPORT DataStorage : public QObject
 {
     Q_OBJECT
 public:
-    // 构造函数：maxPoints 为每个通道最大存储点数，channelCount 为通道数（1~10）
-    explicit DataStorage(int maxPoints = 720000, int channelCount = 5, QObject *parent = nullptr);
+    // maxPoints：每个通道最大存储点数，channelCount：通道数（1~60）
+    explicit DataStorage(int maxPoints = 720000, int channelCount = 10, QObject *parent = nullptr);
     ~DataStorage();
-
-    void addData(int channel, float target, float actual);                     // 添加数据（使用当前时间戳）
-    void addData(int channel, float target, float actual, qint64 timestamp);   // 添加数据（指定时间戳）
-    void addData(const QList<ChannelData>& dataNum);                           // 直接添加通道数据,采用Qt隐式共享机制
-    // 获取指定时间范围内的原始数据
-    void getData(int channel, qint64 startTime, qint64 endTime, QList<float>& targetOut, QList<float>& actualOut, QList<qint64>& timeOut);
-    //获取处理后的数据点数组，用于更新曲线序列，效率超高
-    QList<QPointF>* getPointNum(int ch, qint64 viewStart, qint64 viewEnd, bool isAbs, bool isTarget, int threshold, bool useLTTB);
-    // 获取所有数据的时间范围
-    void getTimeRange(qint64& startTime, qint64& endTime) const;
-    void setBaseTimestamp(qint64 baseTime);                                    // 设置基准时间戳（用于绝对时间显示）
-    qint64 getBaseTimestamp() const;                                           // 获取基准时间戳
-    int  getChannelCount()  const;                                             // 返回存储的通道数量
+    // 数据时间戳必须单调递增！！！
+    void addData(int channel, double value);               // 添加数据（使用内部时间戳）
+    void addData(int channel, double time, double value);  // 添加数据（指定时间戳）
+    void addData(const QList<ChannelData>& dataList);      // 直接添加通道数据
+    void resetData(int channel);                           // 清空通道数据   
+    qint64 dataVersion() const;                            // 数据版本号（写入/清空递增），刷新去重用
+    ChannelData  getData(int channel, int lastN);          // 获取最近的 N 个 数据
+    // 获取指定时间范围内的数据（startTime < 0, endTime < 0时，返回全部数据）
+    ChannelData  getData(int channel, double startTime, double endTime);
+    //获取 降采样处理后的原始数据（指针），减少拷贝开销，支持 M4 和 LTTB 降采样
+    //注意：同一通道同一时刻只允许一个调用方（内部写共享降采样缓冲）
+    ChannelData* getData(int channel, double startTime, double endTime, int threshold, bool isLTTB);
 
 private:
     class Private;

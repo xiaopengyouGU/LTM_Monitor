@@ -2,25 +2,26 @@ cmake_minimum_required(VERSION 3.19)
 project(chart VERSION 1.0.0 LANGUAGES CXX)
 
 # 查找 Qt 组件，最低版本要求6.2
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Charts Concurrent)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Concurrent PrintSupport)
 
 qt_standard_project_setup()
 # 显式列出要构建的源文件，这是开发规范
 set(SOURCES
     src/chart_manager.cpp
-    src/chart_view.cpp
     src/data_importer.cpp
     src/data_exporter.cpp
     src/data_storage.cpp
+    src/chart_controller.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/QCustomPlot/qcustomplot.cpp
 )
 
 set(HEADERS
     include/chart_manager.h
-    include/chart_view.h
     include/data_importer.h
     include/data_exporter.h
     include/data_storage.h
     include/chart_def.h
+    include/chart_controller.h
     include/chart_manager_private.h
 )
 
@@ -31,6 +32,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/QCustomPlot
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -40,8 +42,8 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PUBLIC
         Qt::Core
         Qt::Widgets
-        Qt::Charts
         Qt::Concurrent
+        Qt::PrintSupport
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE CHART_LIBRARY)

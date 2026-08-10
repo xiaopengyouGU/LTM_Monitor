@@ -3,6 +3,7 @@
 
 //CSV数据导入
 #include <QObject>
+#include <QStringList>
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -10,7 +11,7 @@
 #  define CHART_EXPORT Q_DECL_IMPORT
 #endif
 
-class DataStorage;              //前向声明
+class DataStorage;              // 前向声明
 
 class CHART_EXPORT DataImporter : public QObject{
     Q_OBJECT
@@ -24,6 +25,7 @@ public slots:
     void do_dataImport(const QString& fileName);
 signals:
     void importFinished(bool success, const QString& msg);
+    void importNames(const QStringList& names);
     
 private:
     DataStorage* m_storage;
