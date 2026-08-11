@@ -30,17 +30,17 @@ typedef enum {              // 视图类型
     View_XY                 // XY图：通道A为X轴，通道B为Y轴
 }ViewType;
 
-// 用户侧和内部存储（环形缓冲区）共用同一个结构体
+// 通道数据结构体
 struct ChannelData {
-    int channel;            // 通道号（必填）
-    QList<double> times;    // 时间轴（必填）
-    QList<double> values;   // 数值  （必填）
-    int head;               // 读指针 （内部维护）
-    int count;              // 数据长度（内部维护）
+    int channel;            // 通道号
+    QList<double> times;    // 时间戳
+    QList<double> values;   // 数值
 };
 
+// 默认曲线颜色：给通道取默认颜色（写自定义图表界面/对话框时直接取用，按通道号循环配色）
+CHART_EXPORT QColor getChannelColor(int channel);
 
-class ChartManager : public QObject {
+class CHART_EXPORT ChartManager : public QObject {
     Q_OBJECT
 public:
     // ====== 生命周期 ======
@@ -51,10 +51,14 @@ public:
     void stop();            // 停止图表
     void setPeriod(int ms); // 刷新周期（ms），默认100
 
+    // ====== 显示模式 ======
+    void setMode(ShowMode mode);            // Mode_Auto=自动跟随最新，Mode_Hand=手动保持当前范围
+    ShowMode getMode() const;
+
     // ====== 数据写入，时间戳必须单调递增 ======
     void addData(int channel, double value);                    // 自动打时间戳（实时采集）
     void addData(int channel, double time, double value);       // 用户指定时间戳（导入/回放）
-    void addData(const QList<ChannelData>& dataList);           // 批量导入
+    void addData(const QList<ChannelData>& dataList);           // 批量导入：time < 0 时利用内部时间戳（仅适用于一帧多通道），time < 0 时，利用内部时间戳：仅适用于一帧多通道。
 
     // ====== 视图管理 ======
     int  createView(ViewType type);                             // 创建视图，返回视图索引

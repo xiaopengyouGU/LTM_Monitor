@@ -12,7 +12,6 @@ set(SOURCES
     src/data_exporter.cpp
     src/data_storage.cpp
     src/chart_controller.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/QCustomPlot/qcustomplot.cpp
 )
 
 set(HEADERS
@@ -46,4 +45,28 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         Qt::PrintSupport
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE CHART_LIBRARY)
+target_compile_definitions(${PROJECT_NAME} PRIVATE CHART_LIBRARY QCUSTOMPLOT_USE_LIBRARY)
+
+# QCustomPlot 使用预编译 Release 动态库（third_party/QCustomPlot/qcustomplot.dll），
+# 避免每次构建都编译数万行的单文件，也绕开 MinGW Debug 下 COFF 段数超限问题。
+# 重新生成预编译库（一次性）：
+#   cmake -S third_party/QCustomPlot -B third_party/QCustomPlot/prebuilt_build \
+#         -G "MinGW Makefiles" -DCMAKE_PREFIX_PATH=D:/Qt/6.5.11/mingw_64 -DCMAKE_BUILD_TYPE=Release
+#   cmake --build third_party/QCustomPlot/prebuilt_build -j4
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/QCustomPlot/libqcustomplot.dll.a)
+
+# 运行时需要 qcustomplot.dll 与 chart.dll 同目录
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/QCustomPlot/qcustomplot.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    COMMENT "复制预编译 qcustomplot.dll"
+)
+
+# ===== 单元/压力测试（默认关闭，只测公共接口 chart_manager.h；-DCHART_BUILD_TESTS=OFF 关闭）=====
+option(CHART_BUILD_TESTS "Build chart module stress/unit tests" OFF)
+if(CHART_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

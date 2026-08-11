@@ -17,7 +17,7 @@ class CHART_EXPORT DataExporter : public QObject{
 public:
     explicit DataExporter(DataStorage *storage, QObject* parent = nullptr) : m_storage(storage),QObject(parent)
     {   Q_ASSERT_X(m_storage, "DataExporter", "storage cannot be nullptr");
-        if(!m_storage) qDebug("DataImporter: storage is nullptr"); }
+        if(!m_storage) qDebug("DataExporter: storage is nullptr"); }
 
 public slots:
     void do_dataExport(const QString& fileName, double startTime, double endTime, const QStringList& nameList);

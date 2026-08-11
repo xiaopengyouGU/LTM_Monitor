@@ -13,7 +13,7 @@
 
 class DataStorage;              // 前向声明
 
-class CHART_EXPORT DataImporter : public QObject{
+class CHART_EXPORT DataImporter : public QObject {
     Q_OBJECT
 public:
     explicit DataImporter(DataStorage *storage, QObject* parent = nullptr) : m_storage(storage),QObject(parent)

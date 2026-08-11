@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QList>
 #include <QObject>
+#include <QPair>
 #include <QString>
 #include <QWidget>
 #include "chart_manager.h"      // ViewType（定义在 ChartManager 头中，保持不动）
@@ -14,9 +15,9 @@
 #  define CHART_EXPORT Q_DECL_IMPORT
 #endif
 
-// ChartController：渲染层适配器，封装 QCustomPlot 的所有操作。
-// ChartManager 通过它控制显示，不直接接触 QCustomPlot API。
-// 纯渲染层，无业务逻辑：不管数据从哪来、何时刷新、是否降采样。
+// ChartController：单视图的渲染层适配器 + 视图状态持有者。
+// 封装 QCustomPlot 的所有操作，并维护本视图的类型/通道/范围/绝对相对时间/自动跟随等状态；
+// ChartManager 通过 setXXX 修改、刷新时读取快照，不直接接触 QCustomPlot API。
 class CHART_EXPORT ChartController : public QObject
 {
     Q_OBJECT
@@ -52,6 +53,16 @@ public:
 
     // ====== 外观 ======
     void setBackColor(const QColor& color);
+
+    // ====== 视图状态（由 controller 维护，ChartManager 刷新时读取批次快照） ======
+    ViewType viewType() const;                              // 视图类型
+    QList<int> channels() const;                            // 视图绑定的通道列表
+    bool absTime() const;                                   // true=绝对时间，false=相对时间
+    bool autoFollow() const;                                // true=自动跟随最新数据
+    QPair<double,double> viewRange() const;                 // 视图显示范围（手动模式时有效）
+    void setViewRange(double min, double max);              // 程序化设范围（内部切手动模式）
+    void setAbsTime(bool enabled);                          // true=绝对时间，false=相对时间
+    void setAutoFollow(bool enabled);                       // true=自动跟随，false=手动（记住当前范围）
 
     // ====== 交互 ======
     void setInteraction(bool drag, bool zoom);
