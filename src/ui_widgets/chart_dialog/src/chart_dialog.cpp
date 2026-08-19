@@ -1,208 +1,165 @@
 #include "chart_dialog.h"
+#include "channel_list_widget.h"
 #include "chart_manager.h"
 #include "ui_chart_dialog.h"
 
+#include <cmath>
+
+// 默认曲线配色：与模块 chart_def.h 目标/实际色一致，循环分配
+static const QList<QColor> kDefaultColors = {
+    Qt::red, QColor(255, 128, 0), Qt::magenta, Qt::blue, Qt::darkBlue,
+    Qt::green, Qt::yellow, Qt::darkGreen, Qt::cyan, Qt::darkYellow,
+    QColor(128, 0, 128), QColor(255, 192, 203), QColor(139, 69, 19),
+    QColor(128, 128, 0), QColor(75, 0, 130), QColor(144, 238, 144),
+    QColor(255, 165, 0), QColor(138, 43, 226), QColor(135, 206, 235),
+    QColor(255, 127, 80)
+};
+
+// ============================================================
+// 私有实现（Pimpl）：UI 与通道状态收敛于此
+// ============================================================
+class ChartDialog::Private
+{
+public:
+    explicit Private(ChartDialog *dlg) : dlg(dlg) {}
+
+    void setup();                       // UI 创建 + 通道列表信号接线
+    void connectManager(ChartManager *manager, int channelCount);
+    void onChannelValues(const QList<double> &values);
+    void onChannelName(int channel, const QString &name);
+    void onChannelColor(int channel, const QColor &color);
+    void onChannelVisible(int channel, bool visible);
+    void onViewChanged(int index);
+    void onTimeChanged(int index);
+    void onColorChanged(int index);
+    void onClearShow();
+    void onStopShow();
+
+    ChartDialog     *dlg = nullptr;
+    Ui::ChartDialog *ui = nullptr;
+    ChartManager    *m_manager = nullptr;
+    int             m_channelCount = 0;
+};
+
+void ChartDialog::Private::setup()
+{
+    ui = new Ui::ChartDialog;
+    ui->setupUi(dlg);
+
+    // 通道列表 -> 图表管理器（lambda 以 dlg 为接收上下文，随控件销毁自动断开）
+    connect(ui->channelList, &ChannelListWidget::nameEdited, dlg,
+            [this](int channel, const QString &name) { onChannelName(channel, name); });
+    connect(ui->channelList, &ChannelListWidget::colorPicked, dlg,
+            [this](int channel, const QColor &color) { onChannelColor(channel, color); });
+    connect(ui->channelList, &ChannelListWidget::visibleToggled, dlg,
+            [this](int channel, bool visible) { onChannelVisible(channel, visible); });
+}
+
+void ChartDialog::Private::connectManager(ChartManager *manager, int channelCount)
+{
+    if (!manager) return;
+    m_manager = manager;
+    m_channelCount = channelCount;
+
+    // 动态生成通道行：颜色 + 通道名 + 实际值（"-"占位）+ 可见性
+    ui->channelList->clearChannels();
+    for (int ch = 0; ch < m_channelCount; ++ch) {
+        const QColor color = kDefaultColors[ch % kDefaultColors.size()];
+        const bool visible = (ch < 2);                      // 默认只显示 CH0-CH1
+        m_manager->setChannelColor(ch, color);              // 曲线颜色与列表一致
+        m_manager->setChannelVisible(ch, visible);          // 默认可见性与曲线同步
+        ui->channelList->addChannel(ch, QString("CH%1").arg(ch), color, visible);
+    }
+}
+
+void ChartDialog::Private::onChannelValues(const QList<double> &values)
+{   // 中转站节流广播：刷新各通道实际值（NaN = 无数据）
+    const int n = qMin(m_channelCount, values.size());
+    for (int ch = 0; ch < n; ++ch)
+        ui->channelList->setChannelValue(ch, values[ch], !std::isnan(values[ch]));
+}
+
+void ChartDialog::Private::onChannelName(int channel, const QString &name)
+{
+    if (!m_manager) return;
+    m_manager->setChannelName(channel, name);
+}
+
+void ChartDialog::Private::onChannelColor(int channel, const QColor &color)
+{
+    if (!m_manager) return;
+    m_manager->setChannelColor(channel, color);
+}
+
+void ChartDialog::Private::onChannelVisible(int channel, bool visible)
+{
+    if (!m_manager) return;
+    m_manager->setChannelVisible(channel, visible);
+}
+
+void ChartDialog::Private::onViewChanged(int index)
+{
+    if (index < 0) return;
+    emit dlg->viewChanged(index);                           // MainWindow 切换当前视图
+    if (m_manager) {                                        // 时间/背景设置作用于当前视图
+        m_manager->setAbsTime(index, ui->comboTime->currentIndex() != 0);
+        m_manager->setBackColor(index, ui->comboColor->currentIndex());
+    }
+}
+
+void ChartDialog::Private::onTimeChanged(int index)
+{
+    if (!m_manager) return;
+    m_manager->setAbsTime(ui->comboView->currentIndex(), index != 0);
+}
+
+void ChartDialog::Private::onColorChanged(int index)
+{
+    if (!m_manager) return;
+    m_manager->setBackColor(ui->comboView->currentIndex(), index);
+}
+
+void ChartDialog::Private::onClearShow()
+{
+    if (!m_manager) return;
+    m_manager->clearShow();
+}
+
+void ChartDialog::Private::onStopShow()
+{
+    if (!m_manager) return;
+    m_manager->stopShow();
+    for (int ch = 0; ch < m_channelCount; ++ch)
+        ui->channelList->setChannelVisible(ch, false);
+}
+
+// ============================================================
+// 公共接口：委托给私有实现
+// ============================================================
 ChartDialog::ChartDialog(QWidget *parent)
     : QDialog(parent)
-    , ui(new Ui::ChartDialog)
+    , pimpl(new Private(this))
 {
-    ui->setupUi(this);
-    m_manager = nullptr;            // 设置m_manager为nullptr
-    // 初始化可见性数组（默认只有通道1数据可见）
-    for (int i = 0; i < DIALOG_CHANNEL_SIZE; ++i) {
-        m_targetVisible[i] = false;
-        m_actualVisible[i] = false;
-    }
-    m_targetVisible[0] = true;
-    m_actualVisible[0] = true;
-    ui->chkTar1->setChecked(true);
-    ui->chkAct1->setChecked(true);
-    // 颜色数组（必须与 ChartManager 中定义的一致）
-    const QColor targetColors[DIALOG_CHANNEL_SIZE] = {
-        Qt::red, QColor(255, 128, 0), Qt::magenta, Qt::blue, Qt::darkBlue
-    };
-    const QColor actualColors[DIALOG_CHANNEL_SIZE] = {
-        Qt::green, Qt::yellow, Qt::darkGreen, Qt::cyan, Qt::darkYellow
-    };
-
-    // 设置目标值复选框文本颜色
-    for (int i = 0; i < DIALOG_CHANNEL_SIZE; i++) {
-        QString tarName = QString("chkTar%1").arg(i+1);
-        QCheckBox* chkTarget = findChild<QCheckBox*>(tarName);
-        if (chkTarget) {   
-            // 绑定信号与槽函数
-            chkTarget->setStyleSheet(QString("color: %1; font-weight: bold;").arg(targetColors[i].name()));
-            connect(chkTarget, &QCheckBox::clicked, this, &ChartDialog::do_chkBoxClicked);
-        }
-    }
-    // 设置实际值复选框文本颜色
-    for (int i = 0; i < DIALOG_CHANNEL_SIZE; i++) {
-        QString actName = QString("chkAct%1").arg(i+1);
-        QCheckBox* chkActual = findChild<QCheckBox*>(actName);
-        if (chkActual) {   
-            // 绑定信号与槽函数
-            chkActual->setStyleSheet(QString("color: %1; font-weight: bold;").arg(actualColors[i].name()));
-            connect(chkActual, &QCheckBox::clicked, this, &ChartDialog::do_chkBoxClicked);
-        }
-    }
-    // 绑定图例名修改信号与槽函数
-    for (int i = 0; i < DIALOG_CHANNEL_SIZE; i++) {
-        QString editName = QString("editCH%1").arg(i+1);
-        QLineEdit* editCH = findChild<QLineEdit*>(editName);
-        if (editCH) {   
-            // 绑定信号与槽函数
-            connect(editCH, &QLineEdit::textChanged, this, &ChartDialog::do_legendChanged);
-        }
-    }
-
+    pimpl->setup();
 }
 
 ChartDialog::~ChartDialog()
 {
-    delete ui;
+    delete pimpl;
 }
 
-void ChartDialog::do_chkBoxClicked()
+void ChartDialog::connectManager(ChartManager *manager, int channelCount)
 {
-    // 获取发送信号的复选框
-    QCheckBox* chk = qobject_cast<QCheckBox*>(sender());
-    if (!chk) return;
-
-    QString name = chk->objectName();
-    int channel = -1;
-    bool isTarget = false;
-
-    // 解析 objectName，例如 "chkTar1" 或 "chkAct3"
-    if (name.startsWith("chkTar")) {
-        isTarget = true;
-        channel = name.mid(6).toInt() - 1;   // "chkTar1" -> 1 -> 索引0
-    } else if (name.startsWith("chkAct")) {
-        isTarget = false;
-        channel = name.mid(6).toInt() - 1;
-    }
-
-    if (channel < 0 || channel >= 5) return;
-
-    // 更新对应的可见性数组
-    if (isTarget) 
-        m_targetVisible[channel] = chk->isChecked();
-    else 
-        m_actualVisible[channel] = chk->isChecked();
-    
-
-    if (!m_manager)     return;
-    m_manager->setChannelVisible(channel, m_targetVisible[channel], m_actualVisible[channel]);
+    pimpl->connectManager(manager, channelCount);
 }
 
-void ChartDialog::do_legendChanged(const QString& name)
+void ChartDialog::do_channelValues(const QList<double> &values)
 {
-    // 获取发送信号的对象
-    QLineEdit* editCH = qobject_cast<QLineEdit*>(sender());
-    if (!editCH) return;
-    QString str = editCH->objectName();
-    int ch = str.mid(6).toInt() - 1;   // "editCH1" -> 1 -> 索引0
-    // 发送当前通道的新图例名
-    if (!m_manager)      return;
-
-    // 通道复用：以 " | " 为分隔符，左侧=目标值图例，右侧=实际值图例（全/半角空格均可）
-    QString text = name;
-    text.replace(QChar(0x3000), QChar(' '));          // 全角空格 -> 半角
-    QString target, actual;
-    int pos = text.indexOf(" | ");
-    if (pos >= 0) {
-        target = text.left(pos).trimmed();
-        actual = text.mid(pos + 3).trimmed();
-    }
-    if (target.isEmpty() || actual.isEmpty()) {       // 未找到分隔符或任一侧为空
-        target = name + "目标值";
-        actual = name + "实际值";
-    }
-    m_manager->setLegendName(ch, target, actual);
+    pimpl->onChannelValues(values);
 }
 
-void ChartDialog::do_modeChanged(int mode)                       // 更新dialog的当前模式
-{
-    if (mode < 0 || mode > 1) mode = 0;
-    ui->comboMode->setCurrentIndex(mode);
-    if (!m_manager)      return;                                 // 判空
-    m_manager->setMode(mode);                                    // 发送信号
-}
-
-void ChartDialog::on_comboColor_currentIndexChanged(int index)
-{
-    if (!m_manager)      return;
-    m_manager->setBackColor(index);
-}
-
-void ChartDialog::on_comboTime_currentIndexChanged(int index)
-{
-    if (!m_manager)      return;
-    if(index == 0)      m_manager->setAbsTime(false);
-    else                m_manager->setAbsTime(true);
-}
-
-void ChartDialog::on_comboWindow_currentIndexChanged(int index)
-{   // 切换窗口时间
-    if (!m_manager)      return;     // 判空
-    int time = 30;
-    switch (index)
-    {
-        case 0:
-            time = 10;
-            break;
-        case 1:
-            time = 30;
-            break;
-        case 2:
-            time = 60;
-            break;
-        case 3:
-            time = 5*60;
-            break;
-        case 4:
-            time = 15*60;
-            break;
-        case 5:
-            time = 30*60;
-            break;
-        case 6:
-            time = 60*60;
-            break;
-    default:    break;
-    }
-    m_manager->setWindowTime(time);
-}
-
-void ChartDialog::on_comboMode_currentIndexChanged(int index)
-{
-    if (!m_manager)                          return;         // 判空
-    m_manager->setMode(index);
-}
-
-void ChartDialog::on_btnClearShow_clicked()
-{
-    if (!m_manager)                          return;         // 判空
-    m_manager->clearShow();
-}
-
-void ChartDialog::on_btnStopShow_clicked()
-{
-    for(int i = 0; i < DIALOG_CHANNEL_SIZE; i++) {
-        QString tarName = QString("chkTar%1").arg(i+1);
-        QString actName = QString("chkAct%1").arg(i+1);
-        QCheckBox* chkTarget = findChild<QCheckBox*>(tarName);
-        QCheckBox* chkAcutal = findChild<QCheckBox*>(actName);
-        m_targetVisible[i] = false;
-        m_actualVisible[i] = false;
-        chkTarget->setChecked(false);
-        chkAcutal->setChecked(false);
-    }
-    if (!m_manager)      return;                                  //判空
-    m_manager->stopShow();
-}
-
-void ChartDialog::connectManager(ChartManager *manager)                 //绑定信号到图表管理器
-{
-    if (!manager)        return;         //判空
-    m_manager = manager;
-}
+void ChartDialog::on_comboView_currentIndexChanged(int index)    { pimpl->onViewChanged(index); }
+void ChartDialog::on_comboTime_currentIndexChanged(int index)    { pimpl->onTimeChanged(index); }
+void ChartDialog::on_comboColor_currentIndexChanged(int index)   { pimpl->onColorChanged(index); }
+void ChartDialog::on_btnClearShow_clicked()                      { pimpl->onClearShow(); }
+void ChartDialog::on_btnStopShow_clicked()                       { pimpl->onStopShow(); }

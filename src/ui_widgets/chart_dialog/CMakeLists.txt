@@ -2,13 +2,13 @@
 project(chart_dialog LANGUAGES CXX)
 
 # 查找 Qt 组件，最低版本要求6.2
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Charts)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets)
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)                   #编译资源文件，显示图标
 # 显式列出源文件，这是开发规范
-set(SOURCES src/chart_dialog.cpp)
-set(HEADERS include/chart_dialog.h)
+set(SOURCES src/chart_dialog.cpp src/channel_list_widget.cpp)
+set(HEADERS include/chart_dialog.h include/channel_list_widget.h)
 set(UI_FILES ui/chart_dialog.ui)
 
 #添加 autoUIC 搜索路径
@@ -29,7 +29,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}   PUBLIC
         Qt::Core
         Qt::Widgets
-        Qt::Charts
         chart                       #上层CMakeLists保证了引入chart,不用再find_package
 )
 

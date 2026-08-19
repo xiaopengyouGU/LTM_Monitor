@@ -2,42 +2,38 @@
 #define CHART_DIALOG_H
 
 #include <QDialog>
+#include <QList>
 
-class ChartManager;     // 前向声明，加快编译速度
+class ChartManager;     // 前向声明
 
-//这是chart模块的使用示例
-namespace Ui {
-class ChartDialog;
-}
-
-#define DIALOG_CHANNEL_SIZE     5           // 支持的通道数（目标值/实际值），最多 10 通道
-
+// 图表控制对话框：通道列表（颜色/名字/实际值/可见）+ 视图/时间/背景切换。
+// 内部状态（UI/通道数）全部收敛在 Private（Pimpl）中。
 class ChartDialog : public QDialog
 {
     Q_OBJECT
-
 public:
     explicit ChartDialog(QWidget *parent = nullptr);
     ~ChartDialog();
-public:
-    void connectManager(ChartManager *manager);                 // 绑定图表管理器
+
+    void connectManager(ChartManager *manager, int channelCount);   // 绑定图表管理器与通道数
+
+signals:
+    void viewChanged(int viewIndex);        // 当前视图切换（MainWindow 负责切换 QStackedLayout）
+
 public slots:
-    void do_chkBoxClicked();                                    // 点击复选框
-    void do_legendChanged(const QString& name);                 // 图例名修改
-    void do_modeChanged(int mode);                              // 更新dialog的当前模式
+    void do_channelValues(const QList<double>& values);             // 中转站节流广播：各通道实际值
+
 private slots:
-    void on_comboColor_currentIndexChanged(int index);
+    void on_comboView_currentIndexChanged(int index);
     void on_comboTime_currentIndexChanged(int index);
+    void on_comboColor_currentIndexChanged(int index);
     void on_btnClearShow_clicked();
     void on_btnStopShow_clicked();
-    void on_comboWindow_currentIndexChanged(int index);
-    void on_comboMode_currentIndexChanged(int index);
 
 private:
-    Ui::ChartDialog *ui;
-    ChartManager*   m_manager;
-    bool m_targetVisible[DIALOG_CHANNEL_SIZE];
-    bool m_actualVisible[DIALOG_CHANNEL_SIZE];
+    Q_DISABLE_COPY(ChartDialog)
+    class Private;
+    Private *pimpl = nullptr;
 };
 
 #endif // CHART_DIALOG_H

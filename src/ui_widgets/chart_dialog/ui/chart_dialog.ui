@@ -6,14 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>278</height>
+    <width>500</width>
+    <height>440</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>400</width>
-    <height>0</height>
+    <width>500</width>
+    <height>440</height>
    </size>
   </property>
   <property name="font">
@@ -31,187 +31,14 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QGroupBox" name="groupBox">
-     <property name="minimumSize">
-      <size>
-       <width>360</width>
-       <height>0</height>
-      </size>
-     </property>
      <property name="title">
       <string>图表显示</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,1,1">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>通道</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>目标值</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="2">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>实际值</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="3">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>图例</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="minimumSize">
-         <size>
-          <width>60</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>CH1</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QCheckBox" name="chkTar1">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QCheckBox" name="chkAct1">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="3">
-       <widget class="QLineEdit" name="editCH1">
-        <property name="text">
-         <string>CH1</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>CH2</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QCheckBox" name="chkTar2">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="2">
-       <widget class="QCheckBox" name="chkAct2">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="3">
-       <widget class="QLineEdit" name="editCH2">
-        <property name="text">
-         <string>CH2</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string>CH3</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QCheckBox" name="chkTar3">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="2">
-       <widget class="QCheckBox" name="chkAct3">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="3">
-       <widget class="QLineEdit" name="editCH3">
-        <property name="text">
-         <string>CH3</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_8">
-        <property name="text">
-         <string>CH4</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="QCheckBox" name="chkTar4">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="2">
-       <widget class="QCheckBox" name="chkAct4">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="3">
-       <widget class="QLineEdit" name="editCH4">
-        <property name="text">
-         <string>CH4</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="0">
-       <widget class="QLabel" name="label_9">
-        <property name="text">
-         <string>CH5</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="1">
-       <widget class="QCheckBox" name="chkTar5">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="2">
-       <widget class="QCheckBox" name="chkAct5">
-        <property name="text">
-         <string>————</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="3">
-       <widget class="QLineEdit" name="editCH5">
-        <property name="text">
-         <string>CH5</string>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="ChannelListWidget" name="channelList">
+        <property name="alternatingRowColors">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -224,38 +51,48 @@
       <string>功能切换</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
-      <item row="1" column="3">
-       <widget class="QPushButton" name="btnStopShow">
-        <property name="focusPolicy">
-         <enum>Qt::FocusPolicy::NoFocus</enum>
-        </property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelView">
         <property name="text">
-         <string>停止显示</string>
+         <string>视图</string>
         </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QPushButton" name="btnClearShow">
-        <property name="focusPolicy">
-         <enum>Qt::FocusPolicy::NoFocus</enum>
-        </property>
-        <property name="text">
-         <string>清空显示</string>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QComboBox" name="comboTime">
+       <widget class="QComboBox" name="comboView">
         <item>
          <property name="text">
-          <string>相对时间</string>
+          <string>波形视图</string>
          </property>
         </item>
         <item>
          <property name="text">
-          <string>绝对时间</string>
+          <string>频谱视图</string>
          </property>
         </item>
+        <item>
+         <property name="text">
+          <string>波形+频谱</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>XY 图</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QLabel" name="labelColor">
+        <property name="text">
+         <string>背景颜色</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
        </widget>
       </item>
       <item row="0" column="3">
@@ -272,18 +109,8 @@
         </item>
        </widget>
       </item>
-      <item row="0" column="2">
-       <widget class="QLabel" name="label_11">
-        <property name="text">
-         <string>背景颜色</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignmentFlag::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_10">
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelTime">
         <property name="text">
          <string>X轴时间</string>
         </property>
@@ -292,60 +119,32 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QComboBox" name="comboMode">
+      <item row="1" column="1">
+       <widget class="QComboBox" name="comboTime">
         <item>
          <property name="text">
-          <string>自动模式</string>
+          <string>相对时间</string>
          </property>
         </item>
         <item>
          <property name="text">
-          <string>手动模式</string>
+          <string>绝对时间</string>
          </property>
         </item>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QComboBox" name="comboWindow">
-        <property name="currentIndex">
-         <number>1</number>
+      <item row="1" column="2">
+       <widget class="QPushButton" name="btnClearShow">
+        <property name="text">
+         <string>清空显示</string>
         </property>
-        <item>
-         <property name="text">
-          <string>10 s</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>30 s</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>60 s</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>5 min</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>15 min</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>30 min</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>1 h</string>
-         </property>
-        </item>
+       </widget>
+      </item>
+      <item row="1" column="3">
+       <widget class="QPushButton" name="btnStopShow">
+        <property name="text">
+         <string>停止显示</string>
+        </property>
        </widget>
       </item>
      </layout>
@@ -353,6 +152,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ChannelListWidget</class>
+   <extends>QListWidget</extends>
+   <header>channel_list_widget.h</header>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../img.qrc"/>
  </resources>
