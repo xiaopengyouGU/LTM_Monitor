@@ -72,6 +72,7 @@ void CanfdManager::Private::send(const CanfdFrame &frame)
     emit sendCanfd(frame);
 }
 
+
 void CanfdManager::Private::sendBatch(const CanfdFrame &base, int count, int intervalMs, bool idInc)
 {
     emit sendBatchCanfd(base, count, intervalMs, idInc);

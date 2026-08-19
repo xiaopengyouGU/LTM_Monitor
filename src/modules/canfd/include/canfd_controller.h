@@ -5,12 +5,6 @@
 #include <QObject>
 #include "canfd_def.h"
 
-#if defined(CANFD_LIBRARY)
-#  define CANFD_EXPORT Q_DECL_EXPORT
-#else
-#  define CANFD_EXPORT Q_DECL_IMPORT
-#endif
-
 // CAN-FD 控制器：厂商 SDK 的唯一封装层（领域级接口）。
 // 后续移植其他厂商驱动时，只需修改本类，Worker / Manager 无需任何改动。
 class CANFD_EXPORT CanfdController : public QObject

@@ -14,6 +14,7 @@
 
 #define MIN_POLL_TIME           2     // 最小轮询时间 2ms 
 
+
 // CAN ID 标志位（与厂商 SDK 保持一致）
 #define CANFD_EFF_FLAG  0x80000000U   // 扩展帧标志
 #define CANFD_RTR_FLAG  0x40000000U   // 远程帧标志

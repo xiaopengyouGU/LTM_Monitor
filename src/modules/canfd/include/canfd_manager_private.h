@@ -50,7 +50,7 @@ private slots:
 private:
     CanfdManager *m_manager = nullptr;
     QThread      *data_thread = nullptr;
-    CanfdWorker  *m_worker = nullptr;
+    CanfdWorker  *m_worker  = nullptr;
 };
 
 #endif // CANFD_MANAGER_PRIVATE_H

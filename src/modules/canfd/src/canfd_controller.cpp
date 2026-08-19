@@ -18,7 +18,7 @@ UINT FUNC_CALL ZCAN_ReadChannelErrInfo(CHANNEL_HANDLE channel_handle, ZCAN_CHANN
 
 namespace
 {
-const int kMaxBatch = 512;       // 单次读取最大帧数
+    const int kMaxBatch = 512;       // 单次读取最大帧数
 }
 
 class CanfdController::Private
@@ -240,10 +240,10 @@ bool CanfdController::transmit(uint8_t channel, const CanfdFrame &frame)
     ZCAN_TransmitFD_Data d;
     std::memset(&d, 0, sizeof(d));
     d.frame.can_id = frame.id;
-    d.frame.len    = frame.len;
+    d.frame.len    = frame_len;
     d.frame.flags  = frame.flags & 0x0FU;
-    if (frame.len > 0 && !frame.data.isEmpty())
-        std::memcpy(d.frame.data, frame.data.constData(), frame.len);
+    if (frame_len > 0 && !frame.data.isEmpty())
+        std::memcpy(d.frame.data, frame.data.constData(), frame_len);
     d.transmit_type = frame.transmitType;   // 发送方式（0=正常，2=自发自收）
     if (ZCAN_TransmitFD(h, &d, 1) != 1) {
         emit errorOccurred(QString("ZCAN_TransmitFD 失败"));
