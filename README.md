@@ -1,7 +1,28 @@
-# LTM_Monitor – 基于 Qt6 的上位机监控调试软件
+# LTM_Monitor – 基于 Qt6 的监控调试上位机
 
-基于 **Qt 6** 开发的上位机监控调试软件，支持串口 / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
-1000Hz 实时动态曲线、在线 PID 调参、CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出。
+基于 **Qt 6** 开发的监控调试上位机，支持串口 / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
+1000Hz 实时动态曲线、最大支持32通道、在线 PID 调参、CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出。
+
+## 软件界面
+
+<div align="center">
+    <img src="documents/images/界面1.png" alt="主界面">
+    <p><em>主界面 - 串口/CAN-FD通讯、实时曲线显示、数据记录</em></p>
+</div>
+
+<div align="center">
+    <img src="documents/images/界面3.png" alt="CAN-FD 界面">
+    <p><em>CAN-FD 界面 - CAN/CAN-FD通讯、数据记录、定时发送</em></p>
+</div>
+
+<div align="center">
+    <img src="documents/images/界面4.png" alt="UDS 升级界面">
+    <p><em>UDS 升级界面 - 支持串口IAP和CAN-FD UDS在线升级 </em></p>
+</div>
+
+> 以上截图来自实际运行环境，界面可能因版本更新略有差异。
+
+---
 
 ## 核心特性
 
@@ -14,10 +35,28 @@
 - **CAN-FD 协议映射**：DBC / JSON 协议导入（DataMap），信号级解码 + 图表映射表，免改代码适配新报文。
 - **IAP / UDS 双通道烧录**：串口 IAP（LTM 协议）+ CAN-FD UDS（ISO-TP），配合 BootLoader
   实现产线/现场升级，调试烧录一条龙。
-- **动态 PID 调参**：实际值高精度刷新（动态小数位），目标值手动编辑不被自动刷新覆盖。
+- **动态 PID 调参**：实际值高精度刷新（动态小数位），手动下位PID参数和目标值。
 - **CSV 数据导出**：时间戳保留 4 位小数，通道数值动态小数位，可配置导出时长。
 - **高频健壮性**：CAN-FD 积压帧过滤（避免恢复读取时时间轴突跳）、丢帧限频提示、源头格式化
   （表格行在数据线程格式化，UI 零字符串加工）。
+
+## 通讯协议移植
+
+本项目定义了一套轻量级的**通讯协议**（LTM 协议），用于上位机与下位机（如单片机）之间的数据交换。
+协议设计简洁（9 种数据类型、单帧 ≤134B、CRC16 校验），易于移植到各种嵌入式平台，
+且**物理介质无关**——同一套协议可跑串口，也可经 CAN-FD 承载（LTM-over-CANFD）。
+
+协议源码位于 **`examples/protocol/`** 目录，采用纯 C 语言实现，无额外依赖，可直接集成到 ARM Cortex-M 等平台。
+
+同时，笔者在 **`examples/`** 目录下提供了完整的 **STM32 和 Renesas 的协议移植示例**，包含：
+
+- 串口收发驱动适配（UART）与 CAN-FD 承载适配（LTM-over-CANFD）
+- 用户自定义接收处理函数 (user_func)
+- 与上位机联调的演示代码（见 while 主循环）
+
+
+如果你需要将通讯协议移植到其他单片机（如 GD32、ESP32 等），可参考该示例进行适配。
+具体使用方法请直接阅读示例工程中的源码注释。
 
 ## 架构
 
@@ -39,50 +78,6 @@ canfd —— 纯帧收发          protocol/Modbus_Protocol ─┼─→ 字节�
 ## 安装包
 
 安装包 **LTM_Monitor_Installer.exe** 见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Mnitor_V0.3.1)。
-
-## 软件界面
-
-<div align="center">
-    <img src="documents/images/界面1.png" alt="主界面">
-    <p><em>主界面 - 串口通讯、实时曲线显示、数据记录</em></p>
-</div>
-
-<div align="center">
-    <img src="documents/images/界面2.png" alt="主界面">
-    <p><em>主界面 - 串口通讯、实时曲线显示、数据记录</em></p>
-</div>
-
-<div align="center">
-    <img src="documents/images/界面3.png" alt="CAN-FD 界面">
-    <p><em>CAN-FD 界面 - CAN/CAN-FD通讯、数据记录、定时发送</em></p>
-</div>
-
-> 以上截图来自实际运行环境，界面可能因版本更新略有差异。
-
----
-
-## 通讯协议移植
-
-本项目定义了一套轻量级的**通讯协议**（LTM 协议），用于上位机与下位机（如单片机）之间的数据交换。
-协议设计简洁（9 种数据类型、单帧 ≤134B、CRC16 校验），易于移植到各种嵌入式平台，
-且**物理介质无关**——同一套协议可跑串口，也可经 CAN-FD 承载（LTM-over-CANFD）。
-
-协议源码位于 **`examples/protocol/`** 目录，采用纯 C 语言实现，无额外依赖，可直接集成到 ARM Cortex-M 等平台。
-
-同时，笔者在 **`examples/`** 目录下提供了完整的 **STM32 和 Renesas 的协议移植示例**，包含：
-- 串口收发驱动适配（UART）与 CAN-FD 承载适配（LTM-over-CANFD）
-- 用户自定义接收处理函数 (user_func)
-- 与上位机联调的演示代码（见 while 主循环）
-
-示例例程运行结果如下图所示：
-
-<div align="center">
-    <img src="documents/images/界面4.png" alt="示例例程">
-    <p><em>示例例程结果 - 串口通讯、实时曲线显示、数据记录</em></p>
-</div>
-
-如果你需要将通讯协议移植到其他单片机（如 GD32、ESP32 等），可参考该示例进行适配。
-具体使用方法请直接阅读示例工程中的源码注释。
 
 ## 项目目录结构
 
