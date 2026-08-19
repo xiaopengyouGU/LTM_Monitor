@@ -21,6 +21,10 @@ set(CMAKE_AUTORCC ON)
 # 查找 Qt 组件
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Charts Sql SerialPort)
 
+# 启用 CTest：chart 模块自带压力测试（src/modules/chart/tests），
+# 构建后可用 ctest --test-dir build -R tst_chart --output-on-failure 运行
+include(CTest)
+
 # 统一输出目录（所有目标输出到 build/output/ 下）
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
@@ -57,7 +61,11 @@ set(MODULE_TARGETS
     serial
     canfd
     record
+    protocol
     data_map
+    uds_server
+    status_bar
+    uds_widget
     log_analysis
     chart_dialog
     main_window
@@ -79,7 +87,11 @@ install(DIRECTORY src/modules/serial/include/ DESTINATION include/serial)
 install(DIRECTORY src/modules/canfd/include/ DESTINATION include/canfd)
 install(DIRECTORY src/modules/record/include/ DESTINATION include/record)
 install(DIRECTORY src/components/data_map/include/ DESTINATION include/data_map)
+install(DIRECTORY src/components/protocol/include/ DESTINATION include/protocol)
+install(DIRECTORY src/components/uds_server/include/ DESTINATION include/uds_server)
+install(DIRECTORY src/components/status_bar/include/ DESTINATION include/status_bar)
 install(DIRECTORY src/ui_widgets/log_analysis/include/ DESTINATION include/log_analysis)
+install(DIRECTORY src/ui_widgets/uds_widget/include/ DESTINATION include/uds_widget)
 install(DIRECTORY src/ui_widgets/main_window/include/ DESTINATION include/main_window)
 install(DIRECTORY src/ui_widgets/chart_dialog/include/ DESTINATION include/chart_dialog)
 # 如果有其他模块，继续添加
