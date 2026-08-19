@@ -9,14 +9,11 @@ qt_standard_project_setup()
 set(SOURCES
     src/serial_manager.cpp
     src/serial_worker.cpp
-    src/serial_protocol.cpp
 )
 
 set(HEADERS
     include/serial_manager.h
     include/serial_worker.h
-    include/serial_protocol.h
-    include/serial_def.h
     include/serial_manager_private.h
 )
 
