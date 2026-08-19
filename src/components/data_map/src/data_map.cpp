@@ -199,8 +199,9 @@ static bool decodeMessage(const DataMapMessage &msg, const QByteArray &payload,
             return false;
     }
 
-    for (const DataMapSignal &s : msg.signalList) {
-        // 非当前布局的多路信号，跳过
+    for (int i = 0; i < msg.signalList.size(); i++) {
+        const DataMapSignal &s = msg.signalList.at(i);
+        // 非当前布局的多路信号，跳过（序号仍按报文内位置计，保证映射稳定）
         if (s.muxType == DataMap_Muxed && s.muxValue != (int)selectorRaw)
             continue;
 
@@ -209,12 +210,12 @@ static bool decodeMessage(const DataMapMessage &msg, const QByteArray &payload,
             return false;
 
         DataMapDecodedSignal d;
+        d.signalIndex = (quint16)i;
         d.name = s.name;
         d.unit = s.unit;
         d.raw = raw;
         d.value = (double)raw * s.factor + s.offset;
         d.chartChannel = s.chartChannel;
-        d.isTarget = s.isTarget;
         if (!s.valueTable.isEmpty()) {
             auto it = s.valueTable.constFind((int)raw);
             if (it != s.valueTable.constEnd())

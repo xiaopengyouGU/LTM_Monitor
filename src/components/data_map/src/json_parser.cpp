@@ -72,16 +72,6 @@ bool parseJsonFile(const QString &filePath, QList<DataMapMessage> &messages, QSt
                 sig.valueTable.insert(it.key().toInt(), it.value().toString());
 
             sig.chartChannel = so.value("channel").toInt(0);
-            QString series = so.value("series").toString("actual");
-            if (series == "target")
-                sig.isTarget = true;
-            else if (series == "actual")
-                sig.isTarget = false;
-            else
-            {
-                error = QString("信号 %1 的 series 非法：%2（可选 target/actual）").arg(sig.name).arg(series);
-                return false;
-            }
 
             msg.signalList.append(sig);
         }

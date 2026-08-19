@@ -50,7 +50,6 @@ struct DataMapSignal
     DataMapMuxType   muxType = DataMap_MuxNone;
     int              muxValue = 0;              // muxType == DataMap_Muxed 时有效
     int              chartChannel = 0;          // 图表通道：0 = 不映射，1~5 = CH1~CH5
-    bool             isTarget = false;          // true：目标值曲线，false：实际值曲线
     QHash<int, QString> valueTable;             // 枚举值表（DBC VAL_），可选
 };
 
@@ -72,8 +71,8 @@ struct DataMapDecodedSignal
     float   value = 0.0;                        // 物理值：raw * factor + offset
     qint64  raw = 0;                            // 原始值（未缩放）
     QString text;                               // 枚举文本（配置了值表时有效），否则为空
+    quint16 signalIndex = 0;                // 信号在报文内序号（供图表映射表定位）
     int     chartChannel = 0;                   // 图表通道（透传自信号定义）
-    bool    isTarget = false;                   // 目标值/实际值（透传自信号定义）
 };
 
 #endif // DATA_MAP_DEF_H
