@@ -1,0 +1,34 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-GCC-RA8T2-BootLoader",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/core",
+                "${workspaceFolder}/core/protocol",
+                "${workspaceFolder}/port",
+                "${workspaceFolder}/app",
+                "${workspaceFolder}/bsp",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra_gen",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra/fsp/inc",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra/fsp/inc/api",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra/fsp/inc/instances",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra_cfg/fsp_cfg",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra_cfg/fsp_cfg/bsp",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra/arm/CMSIS_6/CMSIS/Core/Include",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra8t2_CPU0/src/drivers/hardware/ra/fsp/src/bsp/cmsis/Device/RENESAS/Include"
+            ],
+            "defines": [
+                "_RENESAS_RA_",
+                "_RA_CORE=CPU0",
+                "_RA_ORDINAL=1"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

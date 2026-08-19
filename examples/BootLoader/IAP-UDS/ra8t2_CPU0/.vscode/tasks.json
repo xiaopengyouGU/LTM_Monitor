@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "BootLoader: Configure + Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B", "build",
+                "-S", "${workspaceFolder}",
+                "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/toolchain.cmake",
+                "-DCMAKE_BUILD_TYPE=Release"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "BootLoader: Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

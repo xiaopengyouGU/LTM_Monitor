@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/Develop/LtMotorLib/BootLoader/IAP-UDS/ra8t2_CPU0/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
