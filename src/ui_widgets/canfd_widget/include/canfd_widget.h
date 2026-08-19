@@ -2,7 +2,6 @@
 #define CANFD_WIDGET_H
 
 #include <QWidget>
-#include "canfd_def.h"
 #include "canfd_frame_model.h"
 
 #if defined(CANFD_WIDGET_LIBRARY)
@@ -11,13 +10,9 @@
 #  define CANFD_WIDGET_EXPORT Q_DECL_IMPORT
 #endif
 
-namespace Ui {
-class CanfdWidget;
-}
 class CanfdManager;
-class CanfdFrameModel;
 
-// CAN-FD 调试界面：帧发送配置 + 帧接收表格
+// CAN-FD 调试界面：帧发送配置 + 帧接收表格。
 class CANFD_WIDGET_EXPORT CanfdWidget : public QWidget
 {
     Q_OBJECT
@@ -38,14 +33,9 @@ private slots:
     void on_chkStopSend_toggled(bool checked);
 
 private:
-    bool parseFrame(CanfdFrame &frame);       // 从控件解析一帧
-
-    Ui::CanfdWidget *ui;
-    CanfdManager    *m_manager   = nullptr;
-    CanfdFrameModel *m_model     = nullptr;
-    bool             m_followBottom = true;   // 表格是否自动跟随最新帧
-    bool             m_paused = false;        // 暂停显示
-
+    Q_DISABLE_COPY(CanfdWidget)
+    class Private;
+    Private *pimpl = nullptr;
 };
 
 #endif // CANFD_WIDGET_H

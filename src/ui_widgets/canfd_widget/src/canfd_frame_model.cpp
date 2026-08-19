@@ -2,8 +2,42 @@
 
 #include <QDateTime>
 
+// ============================================================
+// 私有实现（Pimpl）：环形缓冲/字段查表/序号状态收敛于此
+// ============================================================
+class CanfdFrameModel::Private
+{
+public:
+    explicit Private(int maxRows) : m_capacity(maxRows)
+    {
+        m_buf.resize(m_capacity);   // 预分配，写入 O(1)，无动态扩容/头部搬移
+    }
+
+    int rowCount(const QModelIndex &parent) const;
+    int columnCount(const QModelIndex &parent) const;
+    QVariant data(const QModelIndex &index, int role) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+    void removeOldest(int removed);
+    void appendNew(const QList<CanfdFrameRow> &rows, int n);
+    void clear();
+
+    struct Row
+    {
+        CanfdFrameRow row;
+        QString       seqStr;        // 序号（入表时预格式化，显示零加工）
+    };
+
+    static const QString CanfdFrameRow::*const s_fields[CanfdFrameModel::Col_Count];  // 列 -> 字段查表
+
+    QList<Row>  m_buf;          // 环形缓冲（预分配固定容量）
+    int         m_capacity = 10000;
+    int         m_head = 0;     // 逻辑第 0 行对应的物理索引
+    int         m_count = 0;    // 有效行数
+    quint64     m_seq = 0;
+};
+
 // 列 -> CanfdFrameRow 字段查表（Col_Index 单独处理）
-const QString CanfdFrameRow::*const CanfdFrameModel::s_fields[CanfdFrameModel::Col_Count] = {
+const QString CanfdFrameRow::*const CanfdFrameModel::Private::s_fields[CanfdFrameModel::Col_Count] = {
     nullptr,                              // Col_Index
     &CanfdFrameRow::sysTime,              // Col_SysTime
     &CanfdFrameRow::devTime,              // Col_DevTime
@@ -17,36 +51,29 @@ const QString CanfdFrameRow::*const CanfdFrameModel::s_fields[CanfdFrameModel::C
     &CanfdFrameRow::data,                 // Col_Data
 };
 
-CanfdFrameModel::CanfdFrameModel(int maxRows, QObject *parent)
-    : QAbstractTableModel(parent), m_capacity(maxRows)
-{
-    m_buf.resize(m_capacity);   // 预分配，写入 O(1)，无动态扩容/头部搬移
-}
-
-int CanfdFrameModel::rowCount(const QModelIndex &parent) const
+int CanfdFrameModel::Private::rowCount(const QModelIndex &parent) const
 {
     return parent.isValid() ? 0 : m_count;
 }
 
-int CanfdFrameModel::columnCount(const QModelIndex &parent) const
+int CanfdFrameModel::Private::columnCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : Col_Count;
+    return parent.isValid() ? 0 : CanfdFrameModel::Col_Count;
 }
 
-QVariant CanfdFrameModel::data(const QModelIndex &index, int role) const
+QVariant CanfdFrameModel::Private::data(const QModelIndex &index, int role) const
 {
-    // index isValid 时，row() >= 0 和 column() >= 0 
     if (!index.isValid() || index.row() >= m_count)
         return QVariant();
-    // m_head 在 [0, capacity)，row 在 [0, count]，所以 m_head + row < 2*capacity
-    // 因此，此处的环形缓冲区下标不需要 取模操作，改成减法性能更优
+    // m_head 在 [0, capacity)，row 在 [0, count)，所以 m_head + row < 2*capacity
+    // 因此，此处的环形缓冲区下标不需要取模操作，改成减法性能更优
     int idx = m_head + index.row();
     if (idx >= m_capacity)
-        idx -= m_capacity;    
+        idx -= m_capacity;
     const Row &r = m_buf.at(idx);
-    int column = index.column();
+    const int column = index.column();
     if (role == Qt::TextAlignmentRole) {
-        if (column != Col_Data)
+        if (column != CanfdFrameModel::Col_Data)
             return int(Qt::AlignCenter);
         return int(Qt::AlignLeft | Qt::AlignVCenter);
     }
@@ -54,54 +81,45 @@ QVariant CanfdFrameModel::data(const QModelIndex &index, int role) const
         return QVariant();
 
     // 查表：数据已由中转站解析为字符串，序号入表时预格式化，显示零分支零加工
-    if (column >= Col_Count)
+    if (column >= CanfdFrameModel::Col_Count)
         return QVariant();
-    if (column == Col_Index)
+    if (column == CanfdFrameModel::Col_Index)
         return r.seqStr;
     return r.row.*s_fields[column];
 }
 
-QVariant CanfdFrameModel::headerData(int section, Qt::Orientation orientation, int role) const
+QVariant CanfdFrameModel::Private::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
         return QVariant();
     switch (section) {
-        case Col_Index:      return QString("序号");
-        case Col_SysTime:    return QString("系统时间");
-        case Col_DevTime:    return QString("时间标识");
-        case Col_Channel:    return QString("通道");
-        case Col_Direction:  return QString("收发");
-        case Col_Id:         return QString("ID");
-        case Col_FrameFormat:return QString("Frame");
-        case Col_FrameType:  return QString("类型");
-        case Col_Dlc:        return QString("DLC");
-        case Col_CANFD:      return QString("CAN-FD");
-        case Col_Data:       return QString("数据");
-        default:             return QVariant();
+        case CanfdFrameModel::Col_Index:      return QString("序号");
+        case CanfdFrameModel::Col_SysTime:    return QString("系统时间");
+        case CanfdFrameModel::Col_DevTime:    return QString("时间标识");
+        case CanfdFrameModel::Col_Channel:    return QString("通道");
+        case CanfdFrameModel::Col_Direction:  return QString("收发");
+        case CanfdFrameModel::Col_Id:         return QString("ID");
+        case CanfdFrameModel::Col_FrameFormat:return QString("Frame");
+        case CanfdFrameModel::Col_FrameType:  return QString("类型");
+        case CanfdFrameModel::Col_Dlc:        return QString("DLC");
+        case CanfdFrameModel::Col_CANFD:      return QString("CAN-FD");
+        case CanfdFrameModel::Col_Data:       return QString("数据");
+        default:                              return QVariant();
     }
 }
 
-void CanfdFrameModel::appendRows(const QList<CanfdFrameRow> &rows)
+void CanfdFrameModel::Private::removeOldest(int removed)
 {
-    // 一次最多入 capacity 行（多余丢弃，模型只保留 capacity 行），
-    // 同时保证 m_head + removed < 2*capacity，取模可改为条件减法
-    int n = qMin(rows.size(), m_capacity);
-    if (n <= 0)             return;
+    // 整批移除最旧数据：head 前移 + count 减少，无逐元素搬移。
+    // 保证 m_head + removed < 2*capacity，取模可改为条件减法
+    m_head += removed;
+    if (m_head >= m_capacity)
+        m_head -= m_capacity;
+    m_count -= removed;
+}
 
-    // 容量不足：整批移除最旧数据（一次模型通知，无逐元素搬移）
-    int removed = (m_count + n > m_capacity) ? (m_count + n - m_capacity) : 0;
-    if (removed > 0) {
-        beginRemoveRows(QModelIndex(), 0, removed - 1);
-        m_head += removed;                       // m_head + removed < 2*capacity，减法即可
-        if (m_head >= m_capacity)
-            m_head -= m_capacity;
-        m_count -= removed;
-        endRemoveRows();
-    }
-
-    // 批量写入环形缓冲（O(n)，一次模型通知）
-    int first = m_count;
-    beginInsertRows(QModelIndex(), first, first + n - 1);
+void CanfdFrameModel::Private::appendNew(const QList<CanfdFrameRow> &rows, int n)
+{
     for (int i = 0; i < n; i++) {
         int idx = m_head + m_count;              // m_head + m_count < 2*capacity，减法即可
         if (idx >= m_capacity)
@@ -111,31 +129,81 @@ void CanfdFrameModel::appendRows(const QList<CanfdFrameRow> &rows)
         slot.seqStr = QString::number(++m_seq);
         m_count++;
     }
+}
+
+void CanfdFrameModel::Private::clear()
+{
+    m_head = 0;
+    m_count = 0;
+    m_seq = 0;
+}
+
+// ============================================================
+// 公共接口：override 委托给私有实现（模型通知在外层）
+// ============================================================
+CanfdFrameModel::CanfdFrameModel(int maxRows, QObject *parent)
+    : QAbstractTableModel(parent)
+    , pimpl(new Private(maxRows))
+{
+}
+
+int CanfdFrameModel::rowCount(const QModelIndex &parent) const
+{
+    return pimpl->rowCount(parent);
+}
+
+int CanfdFrameModel::columnCount(const QModelIndex &parent) const
+{
+    return pimpl->columnCount(parent);
+}
+
+QVariant CanfdFrameModel::data(const QModelIndex &index, int role) const
+{
+    return pimpl->data(index, role);
+}
+
+QVariant CanfdFrameModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    return pimpl->headerData(section, orientation, role);
+}
+
+void CanfdFrameModel::appendRows(const QList<CanfdFrameRow> &rows)
+{
+    if (rows.isEmpty() || pimpl->m_capacity <= 0) return;
+    const int n = qMin(rows.size(), pimpl->m_capacity);
+
+    // 容量不足：先整批移除最旧（通知与数据操作严格配对，不嵌套）
+    const int removed = qMax(0, pimpl->m_count + n - pimpl->m_capacity);
+    if (removed > 0) {
+        beginRemoveRows(QModelIndex(), 0, removed - 1);
+        pimpl->removeOldest(removed);
+        endRemoveRows();
+    }
+
+    const int first = pimpl->m_count;
+    beginInsertRows(QModelIndex(), first, first + n - 1);
+    pimpl->appendNew(rows, n);
     endInsertRows();
 }
 
 void CanfdFrameModel::clear()
 {
     beginResetModel();
-    m_head = 0;
-    m_count = 0;
-    m_seq = 0;
+    pimpl->clear();
     endResetModel();
 }
-/********************************** 内部实现 *****************************************/
-// 数据长度 -> DLC 编码（CAN-FD）
+
+// ============================================================
+// 内部实现（帧 -> 显示行）
+// ============================================================
 static int dlcOf(int len)
 {
     if (len <= 8)  return len;
-    // 利用 CAN-FD DLC 编码规律：超过 8 字节时，DLC = 8 + (len - 8 + 3) / 4
-    // 9-64 字节映射到 DLC 9-15
     int dlc = 8 + ((len - 8 + 3) >> 2);         // 位运算，性能更好
     if (dlc > 15) dlc = 15;
     return dlc;
 }
 
-// QStringLiteral(str) 无运行时开销，高频操作中，有极强的性能优势！！！
-// DLC 码 -> 显示字符串（静态表，零分配）
 static const QString s_dlcStr[16] = {
     QStringLiteral("0"),  QStringLiteral("1"),  QStringLiteral("2"),  QStringLiteral("3"),
     QStringLiteral("4"),  QStringLiteral("5"),  QStringLiteral("6"),  QStringLiteral("7"),
@@ -145,7 +213,6 @@ static const QString s_dlcStr[16] = {
 
 static const char kHexTable[] = "0123456789ABCDEF";
 
-// 64 位数值 -> 大写 hex（无前导零）
 static QString toHexTime(quint64 v)
 {
     char buf[17];
@@ -160,7 +227,6 @@ static QString toHexTime(quint64 v)
     return s;
 }
 
-// 数值 -> 固定宽度大写 hex（不足补 0，一次分配）
 static QString toHexFixed(quint64 v, int digits)
 {
     QString s(digits, QLatin1Char('0'));
@@ -171,7 +237,6 @@ static QString toHexFixed(quint64 v, int digits)
     return s;
 }
 
-// 数值 -> 大写 hex（无前导零，保持原显示习惯）
 static QString toHexId(quint32 v)
 {
     char buf[9];
@@ -186,7 +251,6 @@ static QString toHexId(quint32 v)
     return s;
 }
 
-// 数据转 hex 显示：x| 11 22 33（hex 表直拼，零逐字节分配）
 static QString dataToHex(const CanfdFrame &frame)
 {
     QString hex;
@@ -206,11 +270,9 @@ static QString dataToHex(const CanfdFrame &frame)
     return hex;
 }
 
-// 帧 -> 显示行（格式化在源头做一次，模型直接存储）
 CanfdFrameRow CanfdFrameRow::fromFrame(const CanfdFrame &frame, bool isTx)
 {
     CanfdFrameRow r;
-    // 热路径：逐帧执行，字面量用 QStringLiteral（静态数据，无堆分配）
     r.sysTime = (frame.timestampEpochMs <= 0)
                 ? QStringLiteral("-")
                 : QDateTime::fromMSecsSinceEpoch(frame.timestampEpochMs).toString(QStringLiteral("HH:mm:ss.zzz"));

@@ -2,7 +2,6 @@
 #define CANFD_FRAME_MODEL_H
 
 #include <QAbstractTableModel>
-#include <QList>
 #include <QMetaType>
 #include "canfd_def.h"
 
@@ -31,7 +30,8 @@ struct CANFD_WIDGET_EXPORT CanfdFrameRow
 };
 Q_DECLARE_METATYPE(CanfdFrameRow)
 
-// 帧表格模型：环形缓冲存储（预分配固定容量，写入 O(1)，超限自动覆盖最旧）
+// 帧表格模型：环形缓冲存储（预分配固定容量，写入 O(1)，超限自动覆盖最旧）。
+// 缓冲/查表/序号状态全部收敛在 Private（Pimpl）中。
 class CANFD_WIDGET_EXPORT CanfdFrameModel : public QAbstractTableModel
 {
     Q_OBJECT
@@ -63,19 +63,9 @@ public:
     void clear();
 
 private:
-    struct Row
-    {
-        CanfdFrameRow row;
-        QString       seqStr;        // 序号（入表时预格式化，显示零加工）
-    };
-
-    static const QString CanfdFrameRow::*const s_fields[Col_Count];   // 列 -> 字段查表
-
-    QList<Row>  m_buf;          // 环形缓冲（预分配固定容量）
-    int         m_capacity = 10000;
-    int         m_head = 0;     // 逻辑第 0 行对应的物理索引
-    int         m_count = 0;    // 有效行数
-    quint64     m_seq = 0;
+    Q_DISABLE_COPY(CanfdFrameModel)
+    class Private;
+    Private *pimpl = nullptr;
 };
 
 #endif // CANFD_FRAME_MODEL_H

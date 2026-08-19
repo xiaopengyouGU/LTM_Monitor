@@ -30,6 +30,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/ui
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/record/include
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -40,6 +41,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     Qt::Core
     Qt::Widgets
     canfd
+    record
+    uds_server
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE CANFD_WIDGET_LIBRARY)
