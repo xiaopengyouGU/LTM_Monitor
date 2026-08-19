@@ -1,7 +1,7 @@
 # ui_widgets/main_window/CMakeLists.txt
 project(main_window LANGUAGES CXX)
 
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Charts)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets)
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)                   #编译资源文件，显示图标
@@ -9,18 +9,25 @@ set(CMAKE_AUTORCC ON)                   #编译资源文件，显示图标
 # 显式列出源文件，这是开发规范
 set(SOURCES
     src/mainwindow.cpp 
-    src/status_bar.cpp 
-    src/window_data_processor.cpp
+    src/data_hub.cpp
+    src/pid_widget.cpp
+    src/serial_widget.cpp
+    src/console_widget.cpp
 )
 
 set(HEADERS
     include/mainwindow.h 
-    include/status_bar.h 
-    include/window_data_processor.h
+    include/data_hub.h
+    include/pid_widget.h
+    include/serial_widget.h
+    include/console_widget.h
 )
 
 set(UI_FILES  
     ui/mainwindow.ui 
+    ui/pid_widget.ui
+    ui/serial_widget.ui
+    ui/console_widget.ui
 )   # AUTOUIC 会自动处理
 
 #添加 autoUIC 搜索路径
@@ -42,7 +49,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}   PUBLIC
         Qt::Core
         Qt::Widgets
-        Qt::Charts
 )
 
 #链接业务模块
@@ -51,9 +57,13 @@ target_link_libraries(${PROJECT_NAME}   PUBLIC
         serial
         canfd
         record
+        protocol
         data_map
+        chart_map
         chart_dialog
         canfd_widget
+        uds_widget
+        status_bar
         log_analysis
 ) 
 
