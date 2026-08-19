@@ -3,6 +3,10 @@
 基于 **Qt 6** 开发的监控调试上位机，支持串口 / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
 1000Hz 实时动态曲线、最大支持32通道、在线 PID 调参、CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出。
 
+## 安装包
+
+安装包 **LTM_Monitor_Installer.exe** 见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Monitor_V0.4.0)。
+
 ## 软件界面
 
 <div align="center">
@@ -54,19 +58,20 @@
 - 用户自定义接收处理函数 (user_func)
 - 与上位机联调的演示代码（见 while 主循环）
 
-
 如果你需要将通讯协议移植到其他单片机（如 GD32、ESP32 等），可参考该示例进行适配。
 具体使用方法请直接阅读示例工程中的源码注释。
 
-## 架构
+## 项目架构
+
+详细架构说明（分层 / 线程模型 / 数据流 / 代码约定）：[ARCHITECTURE.md](documents/ARCHITECTURE.md)
 
 三层分离，模块间零协议侵入：
 
 ```
-传输层（modules）          协议层（components）        组合层（DataHub）
-serial —— 纯字节收发       protocol/LTM_Protocol ──┐
-canfd —— 纯帧收发          protocol/Modbus_Protocol ─┼─→ 字节流 → 协议解析 → 图表/PID/命令分发
-                            protocol/Modbus_Master ──┘       发送路由：串口优先，否则 CAN-FD
+传输层（modules）              协议层（components）                组合层（DataHub）
+serial —— 纯字节收发        protocol/LTM_Protocol  ──┐
+canfd  —— 纯帧收发         protocol/Modbus_Protocol ─┼─→ 字节流 → 协议解析 → 图表/PID/命令分发
+                           protocol/Modbus_Master ──┘       发送路由：串口优先，否则 CAN-FD
 ```
 
 - **传输层**（`modules/serial`、`modules/canfd`）：只做设备管理、字节/帧收发、轮询，不感知任何协议。
@@ -75,15 +80,12 @@ canfd —— 纯帧收发          protocol/Modbus_Protocol ─┼─→ 字节�
 - **组合层**（`DataHub`，位于 `ui_widgets/main_window`）：串口字节按协议模式分发、
   CAN-FD 0x101 上行 LTM 解析、发送统一路由（串口在线走串口，否则 CAN-FD 0x100 分片）。
 
-## 安装包
-
-安装包 **LTM_Monitor_Installer.exe** 见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Mnitor_V0.3.1)。
-
 ## 项目目录结构
 
 ```
 LTM_Monitor/
 ├── examples/                  # 示例工程（通讯协议移植参考）
+│   ├── BootLoader/            # 串口IAP和CAN-FD UDS 在线升级 BootLoader
 │   ├── protocol/              # 通讯协议实现（C语言，串口 + CAN-FD 承载）
 │   ├── STM32/                 # STM32F103C8T6 最小系统板移植示例
 │   └── Renesas/               # 野火 RA6T2 电机开发板移植示例
@@ -112,13 +114,5 @@ LTM_Monitor/
 ├── script.py                  # 构建辅助脚本
 └── README.md
 ```
-
-## 构建
-
-```bash
-cmake -B build . && cmake --build build
-```
-
-运行需将 Qt 运行库加入 PATH（可借助 `script.py` 自动完成）。
 
 本项目基于 **GNU General Public License (GPL)** 开源，详细条款请见项目中的 `LICENSE` 文件。

@@ -63,12 +63,15 @@ set(MODULE_TARGETS
     record
     protocol
     data_map
+    chart_map
     uds_server
     status_bar
-    uds_widget
-    log_analysis
     chart_dialog
+    log_analysis
     main_window
+    canfd_widget
+    map_table
+    uds_widget
     # 如果有其他模块，继续添加
 )
 
@@ -88,12 +91,15 @@ install(DIRECTORY src/modules/canfd/include/ DESTINATION include/canfd)
 install(DIRECTORY src/modules/record/include/ DESTINATION include/record)
 install(DIRECTORY src/components/data_map/include/ DESTINATION include/data_map)
 install(DIRECTORY src/components/protocol/include/ DESTINATION include/protocol)
+install(DIRECTORY src/components/chart_map/include/ DESTINATION include/chart_map)
 install(DIRECTORY src/components/uds_server/include/ DESTINATION include/uds_server)
 install(DIRECTORY src/components/status_bar/include/ DESTINATION include/status_bar)
 install(DIRECTORY src/ui_widgets/log_analysis/include/ DESTINATION include/log_analysis)
 install(DIRECTORY src/ui_widgets/uds_widget/include/ DESTINATION include/uds_widget)
 install(DIRECTORY src/ui_widgets/main_window/include/ DESTINATION include/main_window)
 install(DIRECTORY src/ui_widgets/chart_dialog/include/ DESTINATION include/chart_dialog)
+install(DIRECTORY src/ui_widgets/canfd_widget/include/ DESTINATION include/canfd_widget)
+install(DIRECTORY src/ui_widgets/map_table/include/ DESTINATION include/map_table)
 # 如果有其他模块，继续添加
 
 # 4. 安装第三方库
@@ -106,6 +112,14 @@ if(EXISTS ${SQLDRIVERS_DIR})
         FILES_MATCHING PATTERN "*.dll"
     )
 endif()
+
+# chart 运行时依赖 qcustomplot.dll，canfd 运行时依赖 ControlCANFD.dll，
+# 都必须与可执行文件同目录，否则程序启动报缺 DLL
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/chart/third_party/QCustomPlot/qcustomplot.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/canfd/third_party/zcan/ControlCANFD.dll
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 # 如果有其他第三方 DLL，同理
 
 # 5. 生成 Qt 部署脚本（将 Qt 运行时依赖复制到安装目录）

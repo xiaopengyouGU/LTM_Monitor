@@ -73,13 +73,10 @@ def run_install():
         "Qt6Core.dll",
         "Qt6Gui.dll",
         "Qt6Widgets.dll",
-        "Qt6Charts.dll",
-        "Qt6OpenGL.dll",
         "Qt6Concurrent.dll",
-        "Qt6OpenGLWidgets.dll",
         "Qt6SerialPort.dll",
         "Qt6Sql.dll",
-        #"Qt6PrintSupport.dll",  # 可选，但 Charts 可能需要
+        "Qt6PrintSupport.dll", 
     ]
     
     print(">>> 手动复制 Qt DLL...")
