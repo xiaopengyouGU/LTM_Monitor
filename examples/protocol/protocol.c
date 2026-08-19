@@ -1,16 +1,30 @@
 #include "protocol/protocol.h"
+#include<string.h>
+#include<stdio.h>
+
+typedef struct {
+    uint8_t buffer[RB_SIZE];    /* 环形缓冲区 */
+    uint16_t head;              /* 写指针，指向下一个写入的位置 */
+    uint16_t tail;              /* 读指针，指向第一个可读数据 */
+}ring_buffer_t;
+
+/* 协议处理结构体 */
+typedef struct {
+    ring_buffer_t rb;           /* 环形缓冲区 */
+    uint8_t send_buf[SEND_BUF_SIZE];  /* 待发送数据缓冲区 */
+    uint8_t buf_len;            /* 发送缓冲区数据长度 */
+    uint8_t flag;               /* 0 : 不显示数据, 1 : 显示详细数据 */
+}protocol_obj;
 
 static protocol_obj _prot_obj;
 static protocol_obj *prot = &_prot_obj;
-
-static const char* data_type_to_str(uint8_t type);
 static uint16_t crc16_check(const uint8_t* data, uint16_t len);
-//环形缓冲区公共接口
+/* 环形缓冲区公共接口 */
 static void rb_init(ring_buffer_t *rb);
 static bool rb_write(ring_buffer_t *rb, const uint8_t *data, uint16_t len);
 static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *out_type, uint8_t *out_payload, uint16_t *out_payload_len);
 
-//协议对象接口                 
+/* 协议对象接口 */                 
 void protocol_init(uint8_t flag)
 {
     prot->flag = flag;
@@ -25,10 +39,10 @@ bool protocol_process(uint8_t *data_type, uint8_t *datas, uint16_t *data_len)   
 
     if(res)
     {
-        if(prot->flag != 0)
+        if(prot->flag)
         {
             printf("\nprocess protocol success!!! \n");
-            printf("data len = %d, \t data type : %s (0x%02X)\n", *data_len, data_type_to_str(*data_type),*data_type);
+            printf("data len = %d, \t data type : 0x%02X \n", *data_len, *data_type);
             printf("recv datas : \n");
             for(uint16_t i = 0; i < *data_len; i++)
             {
@@ -39,7 +53,7 @@ bool protocol_process(uint8_t *data_type, uint8_t *datas, uint16_t *data_len)   
     }
     else
     {
-        if(prot->flag != 0) 
+        if(prot->flag) 
             printf("process protocol failed! \n");
     }
     return res;
@@ -53,28 +67,30 @@ void protocol_package(uint8_t data_type, uint8_t *datas, uint16_t data_len)    /
     hdr.header = FRAME_HEADER;							/* 帧头 */
     hdr.data_type = data_type;							/* 数据类型 */
     hdr.data_len = (uint8_t)data_len;					/* 数据长度 < 128 */
+    uint16_t hdr_size = sizeof(hdr);                    
     /* 定位 CRC 位置 */
-    uint8_t* data_ptr = prot->send_buf + sizeof(hdr);  	/* 数据起始位置 */
-    uint8_t* crc_ptr = data_ptr + data_len;            	/* crc起始位置 */
+    uint8_t *send_buf = prot->send_buf;
+    uint8_t *data_ptr = send_buf + hdr_size;  	        /* 数据起始位置 */
+    uint8_t *crc_ptr  = data_ptr + data_len;            /* crc起始位置 */
     
-    memcpy(prot->send_buf, &hdr, sizeof(hdr));
+    memcpy(send_buf, &hdr,  hdr_size);
     memcpy(data_ptr, datas, data_len);
 	/* 启动 CRC 校验 */
-    uint16_t crc = crc16_check(prot->send_buf, data_len + sizeof(hdr));
+    uint16_t crc = crc16_check(send_buf, data_len + hdr_size);
     memcpy(crc_ptr, &crc, 2);
-    //记录缓冲区数据长度
-    prot->buf_len = sizeof(hdr) + data_len + sizeof(crc);
+    /* 记录发送缓冲区数据长度 */
+    prot->buf_len = hdr_size + data_len + sizeof(crc);
 
     /* 打印打包好的数据 */
-    if(prot->flag != 0)
+    if(prot->flag)
     {
         printf("send buf (len = %d) : \n", prot->buf_len);
         for(uint16_t i = 0; i < prot->buf_len; i++)
         {
-            printf("0x%02x ",prot->send_buf[i]);
+            printf("0x%02x ", send_buf[i]);
         }
         printf("\n");
-        printf("data len = %d, \t data type : %s (0x%02X)\n",data_len,data_type_to_str(data_type),data_type);
+        printf("data len = %d, \t data type : 0x%02X \n",data_len, data_type);
         printf("send datas : \n");
         for(uint16_t i = 0; i < data_len; i++)
         {
@@ -84,19 +100,20 @@ void protocol_package(uint8_t data_type, uint8_t *datas, uint16_t data_len)    /
     }
 }
 
-uint8_t* protocol_datas(uint16_t *len)                              /* 获取发送缓冲区数据 */
+uint8_t* protocol_datas(uint16_t *len)                  /* 获取发送缓冲区数据 */
 {
+    if(!len)            return NULL;                    /* 判空 */            
     *len = prot->buf_len;
-    return prot->send_buf;              							/* 返回缓冲区 */
+    return prot->send_buf;              			    /* 返回缓冲区 */
 }
 
-void protocol_recv(uint8_t *buf, uint16_t buf_len)					/* 将数据写入环形缓冲区 */
+void protocol_recv(uint8_t *buf, uint16_t buf_len)		/* 将数据写入环形缓冲区 */
 {
     rb_write(&prot->rb, buf, buf_len);
 }
 
 /************************************* 内部函数 ******************************************/
-//经典CRC校验算法
+/* 经典CRC校验算法，与 Modbus RTU 相同 */
 static uint16_t crc16_check(const uint8_t* data, uint16_t len)
 {
     uint16_t crc = 0xFFFF;
@@ -119,28 +136,28 @@ static void rb_init(ring_buffer_t *rb)
     rb->head = rb->tail = 0;
 }
 
-//返回可读数据字节数
+/* 返回可读数据字节数 */
 static uint16_t rb_available(ring_buffer_t *rb)
 {
     return (rb->head + RB_SIZE - rb->tail) % RB_SIZE;
 }
 
-//返回剩余可写空间，不包括1个保留位
+/* 返回剩余可写空间，不包括1个保留位 */
 static uint16_t rb_space(ring_buffer_t *rb)
 {
     return (rb->tail + RB_SIZE - rb->head - 1) % RB_SIZE;
 }
 
-//写入数据，成功返回true,空间不足返回false
+/* 写入数据，成功返回true，空间不足返回false */
 static bool rb_write(ring_buffer_t *rb, const uint8_t *data, uint16_t len)
 {
-    if(rb_space(rb) < len) return false;   //避免多次写入未读取而导致的数据覆盖
+    if(rb_space(rb) < len) return false;   /* 避免多次写入未读取而导致的数据覆盖 */
 
     uint16_t head = rb->head;
     for(uint16_t i = 0; i < len; i++)
     {
         rb->buffer[head] = data[i];
-        head = (head + 1) % RB_SIZE;        //环形缓冲区
+        head = (head + 1) % RB_SIZE;       
     }
     rb->head = head;
     return true;
@@ -161,7 +178,7 @@ static bool rb_peek(ring_buffer_t *rb, uint16_t offset, uint8_t *data, uint16_t 
     return true;
 }
 
-//消费数据，向前移动读指针len字节
+/* 消费数据，向前移动读指针len字节 */
 static bool rb_consume(ring_buffer_t *rb, uint16_t len)
 {
     uint16_t avail = rb_available(rb);
@@ -175,9 +192,9 @@ static bool rb_consume(ring_buffer_t *rb, uint16_t len)
 /* 环形缓冲区帧解析函数 */
 static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *data_type, uint8_t *data_buf, uint16_t *data_len)
 {
-	const uint8_t hdr_size = sizeof(protocol_header);
+	const uint16_t hdr_size = sizeof(protocol_header);
 		
-    while (rb_available(rb) >= (hdr_size ))    /* 至少要有帧头（2）+ 数据类型（1）+ 数据长度（1）*/
+    while (rb_available(rb) >= (hdr_size))  /* 至少要有帧头（2）+ 数据类型（1）+ 数据长度（1）*/
     {
         uint16_t header;
         if(!rb_peek(rb, 0, (uint8_t*)&header, 2)) break;
@@ -205,8 +222,8 @@ static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *data_type, uint8_t *data_
         /* 检查是否有完整的一帧 */
         if(rb_available(rb) < total_len) break;
 
-        /* 读取完整数据帧到缓冲区中 */
-        uint8_t buffer[PROTOCOL_DATA_SIZE + 6];
+        /* 读取完整数据帧到缓冲区中，避免解析过程中发生数据覆盖 */
+        uint8_t buffer[RECV_BUF_SIZE];
         uint16_t crc_recv;
 		if(!rb_peek(rb, 0, buffer, total_len)) break;
 		memcpy(&crc_recv, buffer + hdr_size + hdr_data_len, 2);
@@ -227,45 +244,4 @@ static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *data_type, uint8_t *data_
 		return true;
     }
     return false;
-}
-
-
-static const char* data_type_names[Data_Unknown] = {
-    "Data_Target",
-    "Data_Position",
-    "Data_Velocity",
-    "Data_Current",
-    "Data_Motor_Tempe",
-    "Data_Driver_Tempe",
-    "Data_CMD_Start",
-    "Data_CMD_Reset",
-    "Data_CMD_Set_PID",
-    "Data_CMD_Set_Period",
-    "Data_CMD_Stop",
-    "Data_CMD_Jog",
-    "Data_CMD_Forw",
-    "Data_CMD_Reve",
-    "Data_CMD_Text",              //文字指令，仅限控制台收发
-    "Data_Ctrl_Pos",
-    "Data_Ctrl_Vel",
-    "Data_Ctrl_Tor",
-    "Data_Ctrl_Open_Pos",
-    "Data_Ctrl_Open_Vel",
-    "Data_Ctrl_Sensorless_Vel",
-    "Data_Ctrl_Stop_Quick",
-    "Data_Res_Start",
-    "Data_Res_Stop",
-    "Data_Channel1",
-    "Data_Channel2",
-    "Data_Channel3",
-    "Data_Channel4",
-    "Data_Channel5",
-	"Data_Channel_ALL",
-	"Data_User_Defined",			/* 用户自定义通讯内容 */
-};
-
-static const char* data_type_to_str(uint8_t type) 
-{
-    if(type < Data_Unknown)		return data_type_names[type]; 
-    else    					return "Data_Unknown";
 }
