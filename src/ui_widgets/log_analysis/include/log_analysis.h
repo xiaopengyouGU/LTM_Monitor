@@ -2,17 +2,11 @@
 #define LOG_ANALYSIS_H
 
 #include <QWidget>
-#include <QSortFilterProxyModel>
 
-// 前向声明，提高编译速度
-class RecordManager;
-class LogTableModel;
-struct RecordData;   
+class RecordManager;    // 前向声明，提高编译速度
 
-namespace Ui {
-class LogAnalysis;
-}
-
+// 日志分析器：打开 .log/.db3 文件，表格展示 + 排序/过滤。
+// 内部状态（模型/代理/记录管理器）全部收敛在 Private（Pimpl）中。
 class LogAnalysis : public QWidget
 {
     Q_OBJECT
@@ -28,26 +22,10 @@ private slots:
     void on_btnOpenFile_clicked();   // 打开 .log 文件
     void on_btnOpenDB_clicked();     // 打开 .db3 数据库
 
-    // 解析相关槽（do_前缀）
-    void do_parseFinished(QList<RecordData>* logs);
-    void do_parseError(const QString& error);
-    void do_parseProgress(int current, int total);
-
-    // 排序和过滤
-    void do_sortFieldChanged(int index);
-    void do_sortOrderChanged();
-    void do_filterChanged();
-
 private:
-    void loadLogs(QList<RecordData>&& logs);   // 移动数据到模型
-    void updateStatus();                       // 更新故障状态显示
-
-    LogTableModel *m_model;                 // 数据模型
-    QSortFilterProxyModel *m_proxy;         // 排序/过滤代理
-    RecordManager *m_manager;               // 记录管理器（外部传入）
-
-private:
-    Ui::LogAnalysis *ui;
+    Q_DISABLE_COPY(LogAnalysis)
+    class Private;
+    Private *pimpl = nullptr;
 };
 
 #endif // LOG_ANALYSIS_H

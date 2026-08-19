@@ -1,41 +1,64 @@
 #include "log_table_model.h"
+#include "record_manager.h"     // RecordData 完整定义
+
+// ============================================================
+// 私有实现（Pimpl）：数据存储收敛于此
+// ============================================================
+class LogTableModel::Private
+{
+public:
+    QList<RecordData> m_logs;
+};
 
 LogTableModel::LogTableModel(QObject *parent)
-    : QAbstractTableModel(parent) {}
+    : QAbstractTableModel(parent)
+    , pimpl(new Private)
+{
+}
 
-void LogTableModel::setLogs(QList<RecordData>&& logs)
+LogTableModel::~LogTableModel()
+{
+    delete pimpl;
+}
+
+void LogTableModel::setLogs(QList<RecordData> &&logs)
 {
     beginResetModel();
-    m_logs = std::move(logs);   // 转移资源，原logs变为空（不会出现内存泄漏问题）
+    pimpl->m_logs = std::move(logs);    // 转移资源，原 logs 变为空
     endResetModel();
 }
 
-void LogTableModel::setLogs(const QList<RecordData>& logs)
+void LogTableModel::setLogs(const QList<RecordData> &logs)
 {
     beginResetModel();
-    m_logs = logs;   // 拷贝（不常用，保留兼容）
+    pimpl->m_logs = logs;               // 拷贝（不常用，保留兼容）
     endResetModel();
+}
+
+const QList<RecordData> &LogTableModel::logs() const
+{
+    return pimpl->m_logs;
 }
 
 int LogTableModel::rowCount(const QModelIndex &parent) const
 {
     if (parent.isValid())
         return 0;
-    return m_logs.size();
+    return pimpl->m_logs.size();
 }
 
 int LogTableModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return ColCount;   // 共3列：时间、优先级、内容
+    return ColCount;                    // 共3列：时间、优先级、内容
 }
 
 QVariant LogTableModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() >= m_logs.size())
+    if (!index.isValid() || index.row() >= pimpl->m_logs.size())
         return QVariant();
 
-    const RecordData &log = m_logs.at(index.row());
+    const RecordData &log = pimpl->m_logs.at(index.row());
 
     if (role == Qt::DisplayRole) {
         switch (index.column()) {
