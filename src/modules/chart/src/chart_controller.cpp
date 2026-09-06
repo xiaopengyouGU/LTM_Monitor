@@ -393,10 +393,32 @@ void ChartController::Private::setYAxisTitle(const QString& title)
 
 void ChartController::Private::setBackColor(const QColor& color)
 {
+    // Foreground follows background luminance: dark bg -> light ticks/labels; light bg -> dark.
+    const bool   dark      = color.lightness() < 128;
+    const QColor textColor = dark ? QColor(235, 235, 235) : QColor(40, 40, 40);
+    const QColor axisColor = dark ? QColor(160, 160, 160) : QColor(40, 40, 40);
+
+    const auto applyAxisStyle = [&](QCPAxis *axis) {
+        if (!axis) return;
+        axis->setBasePen(QPen(axisColor));
+        axis->setTickPen(QPen(axisColor));
+        axis->setSubTickPen(QPen(axisColor));
+        axis->setTickLabelColor(textColor);
+        axis->setLabelColor(textColor);
+    };
+
     plot->setBackground(color);
     plot->axisRect()->setBackground(color);
     if (specRect)
         specRect->setBackground(color);
+
+    applyAxisStyle(plot->xAxis);
+    applyAxisStyle(plot->yAxis);
+    if (specRect) {
+        applyAxisStyle(specRect->axis(QCPAxis::atBottom));
+        applyAxisStyle(specRect->axis(QCPAxis::atLeft));
+    }
+
     m_fullReplotPending = true;          // 背景变化：下一帧整图重绘
 }
 
