@@ -218,7 +218,10 @@ void DataHub::Private::handleLtmFrame(uint8_t type, const QByteArray &data, qint
 void DataHub::Private::sendLtm(uint8_t type, const QByteArray &data)
 {
     /* 路由：串口在线优先（既有行为），否则 CAN-FD 0x100（LTM-over-CANFD） */
-    const QByteArray frame = ltmSerial.package(type, data);  // LTM 帧组装统一在上层（DataHub）
+    QByteArray frame = data;                    // 非 LTM 协议，则发送原始数据
+    if (m_serialProtocol == Prot_LTM) {
+        frame = ltmSerial.package(type, data);  // LTM 帧组装统一在上层（DataHub）
+    } 
     if (m_serialOnline && m_serial)
         m_serial->send(frame);                              // 串口：字节直发
     else if (m_canfd && m_canfd->isActive()) {

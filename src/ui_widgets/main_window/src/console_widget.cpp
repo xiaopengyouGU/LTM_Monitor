@@ -78,8 +78,10 @@ void ConsoleWidget::Private::setInfo(const QString &msg)
 void ConsoleWidget::Private::setHexSend(bool on)
 {
     if (on) {
+        m_hexSendMode = true;
         ui->editCMD->setText(toHexDisplay(ui->editCMD->text()));     // 编辑框转 hex
     } else {
+        m_hexSendMode = false;
         ui->editCMD->setText(fromHexDisplay(ui->editCMD->text().trimmed()));  // hex 还原
     }
 }
@@ -269,7 +271,6 @@ void ConsoleWidget::connectManager(SerialManager *manager)
 {
     pimpl->m_manager = manager;
 }
-
 
 
 void ConsoleWidget::setStatusBar(StatusBar *bar)     { pimpl->m_bar = bar; }

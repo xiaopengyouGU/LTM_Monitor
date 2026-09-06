@@ -63,11 +63,11 @@ void SerialWidget::Private::setInfo(const QString &msg)
 void SerialWidget::Private::sendText(const QByteArray &data)
 {
     if (!m_manager) return;
-    if (ui->comboProt->currentIndex() == 2) {           // Modbus RTU 协议下不允许该接口
+    if (ui->comboProt->currentIndex() == Prot_Modbus) { // Modbus RTU 协议下不允许该接口
         setInfo("Modbus 模式下不支持 ‘发送指令’ 接口！");
         return;
-    }
-    if (m_hub) m_hub->sendLtm(Data_CMD_Text, data);
+    } 
+    if (m_hub) m_hub->sendLtm(Data_CMD_Text, data);     // 该接口同时支持普通串口和LTM，内部自动判断
     if (ui->chkSendPeriod->isChecked() && m_hub)
         m_hub->startPeriodSendLtm(Data_CMD_Text, data, ui->spinSendPeriod->value());
 }

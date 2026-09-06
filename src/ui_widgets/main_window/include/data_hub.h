@@ -36,7 +36,7 @@ public:
     void setUpgradeMode(bool on);                             // UDS 升级模式：旁路表格显示/图表解码，仅转发原始帧
     void setSendChannels(SerialManager *serial, CanfdManager *canfd);  // 发送通道注入（路由用）
     void setSerialOnline(bool on);                            // 串口在线状态（主窗口同步）
-    void sendLtm(uint8_t type, const QByteArray &data);       // 统一发送：串口优先，否则 CAN-FD 0x100（LTM-over-CANFD）
+    void sendLtm(uint8_t type, const QByteArray &data);       // 统一发送数据（支持LTM和普通串口）：串口优先，否则 CAN-FD 0x100（LTM-over-CANFD）
     void setSerialProtocol(int type);                         // 串口协议模式（Prot_LTM / Prot_Common / Prot_Modbus）
     void setModbusMaster(ModbusMaster *master);               // Modbus 主站事务器挂接
     void startPeriodSendLtm(uint8_t type, const QByteArray &data, int intervalMs);  // 周期发送 LTM 帧
