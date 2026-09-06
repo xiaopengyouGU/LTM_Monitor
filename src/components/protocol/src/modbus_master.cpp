@@ -42,7 +42,7 @@ private:
     ModbusConfig m_pollCfg;
     bool m_pollOn = false;
     bool m_busy   = false;
-    int  m_miss   = 0;
+    int  m_miss   = 0;                              // 看门狗超时计数器
 };
 
 ModbusMaster::Private::Private(ModbusMaster *master)
@@ -55,7 +55,7 @@ ModbusMaster::Private::Private(ModbusMaster *master)
 
     m_watchdog = new QTimer(this);
     m_watchdog->setSingleShot(true);
-    m_watchdog->setInterval(300);
+    m_watchdog->setInterval(1000);
     connect(m_watchdog, &QTimer::timeout, this, &Private::do_watchdogTimeout);
 }
 
@@ -65,10 +65,7 @@ void ModbusMaster::Private::start(const ModbusConfig &cfg)
     m_pollOn  = true;
     m_miss    = 0;
     m_pollTimer->start(cfg.intervalMs);
-    QByteArray qty;                                 // 读请求数据区 = 数量（2 字节大端）
-    qty.append((char)(cfg.quantity >> 8));
-    qty.append((char)(cfg.quantity & 0xFF));
-    enqueue(cfg, qty, false);
+    enqueue(cfg, QByteArray(), false);      // 轮询读取时只需配置Modbus结构体，无需传递数据
 }
 
 void ModbusMaster::Private::stop()
@@ -93,12 +90,14 @@ void ModbusMaster::Private::receive(const QByteArray &bytes)
     m_modbus.receive(bytes);
     QByteArray data;
     if (m_modbus.process(m_pending.cfg, data)) {    // 主站一个请求对应一个响应
-        if (m_pending.cfg.func & 0x80)
+        if (m_pending.cfg.isException) {
             emit modbusException(m_pending.cfg, (uint8_t)data.at(0));
-        else
+        } else {
             emit modbusResponse(m_pending.cfg, data);
+        }
         m_watchdog->stop();                         // 喂狗
         m_busy = false;                             // 释放总线
+        m_miss = 0;                                 // 收到响应，重置超时计数器
         pump();                                     // 尝试发下一个事务
     }
 }
@@ -115,24 +114,19 @@ void ModbusMaster::Private::enqueue(const ModbusConfig &cfg, const QByteArray &p
 
 void ModbusMaster::Private::pump()
 {
-    if (m_busy || m_queue.empty())
-        return;
+    if (m_busy || m_queue.empty())  return;
     m_pending = m_queue.front();
     m_queue.pop_front();
     m_busy = true;
     m_watchdog->start();
-    if (m_send)
+    if (m_send)  
         m_send(m_modbus.package(m_pending.cfg, m_pending.payload));
 }
 
 void ModbusMaster::Private::do_pollTimeout()
 {
-    if (!m_pollOn || m_busy || !m_queue.empty())
-        return;                                     // 去重：在途或队列非空则跳过
-    QByteArray qty;
-    qty.append((char)(m_pollCfg.quantity >> 8));
-    qty.append((char)(m_pollCfg.quantity & 0xFF));
-    enqueue(m_pollCfg, qty, false);
+    if (!m_pollOn || m_busy || !m_queue.empty())  return; // 去重：在途或队列非空则跳过
+    enqueue(m_pollCfg, QByteArray(), false);      // 轮询读取时只需配置Modbus结构体，无需传递数据 
 }
 
 void ModbusMaster::Private::do_watchdogTimeout()
