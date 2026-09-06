@@ -252,6 +252,13 @@ void ChartManager::Private::setViewRange(int viewIndex, double startTime, double
     updateData();
 }
 
+void ChartManager::Private::setWindowLen(double seconds)
+{
+    if (seconds <= 0.0) return;
+    m_windowLen = seconds;
+    m_forceRefresh = true;   // 仅标记，下一轮定时刷新按新窗口取数
+}
+
 void ChartManager::Private::setAbsTime(int viewIndex, bool enabled)
 {
     if (viewIndex < 0 || viewIndex >= controllers.size()) return;
@@ -676,6 +683,7 @@ void ChartManager::setChannelColor(int channel, const QColor& color)     { pimpl
 void ChartManager::setChannelVisible(int channel, bool visible)          { pimpl->setChannelVisible(channel, visible); }
 
 void ChartManager::setViewRange(int viewIndex, double startTime, double endTime) { pimpl->setViewRange(viewIndex, startTime, endTime); }
+void ChartManager::setWindowLen(double seconds)          { pimpl->setWindowLen(seconds); }
 void ChartManager::setAbsTime(int viewIndex, bool enabled)               { pimpl->setAbsTime(viewIndex, enabled); }
 void ChartManager::setBackColor(int viewIndex, int color)                { pimpl->setBackColor(viewIndex, color); }
 

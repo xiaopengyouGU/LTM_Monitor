@@ -27,6 +27,7 @@ private slots:
     void on_comboView_currentIndexChanged(int index);
     void on_comboTime_currentIndexChanged(int index);
     void on_comboColor_currentIndexChanged(int index);
+    void on_comboRange_currentIndexChanged(int index);
     void on_btnClearShow_clicked();
     void on_btnStopShow_clicked();
 

@@ -76,6 +76,7 @@ public:
 
     // ====== 坐标轴 ======
     void setViewRange(int viewIndex, double startTime, double endTime); // 设置X轴范围
+    void setWindowLen(double seconds);                  // 自动跟随显示窗口长度（秒）
     void setAbsTime(int viewIndex, bool enabled);               // true=绝对时间，false=相对时间
     void setBackColor(int viewIndex, int color);                // 0=白，1=黑
 

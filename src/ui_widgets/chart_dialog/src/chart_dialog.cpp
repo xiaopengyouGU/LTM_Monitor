@@ -32,6 +32,7 @@ public:
     void onViewChanged(int index);
     void onTimeChanged(int index);
     void onColorChanged(int index);
+    void onRangeChanged(int index);
     void onClearShow();
     void onStopShow();
 
@@ -119,6 +120,14 @@ void ChartDialog::Private::onColorChanged(int index)
     m_manager->setBackColor(ui->comboView->currentIndex(), index);
 }
 
+void ChartDialog::Private::onRangeChanged(int index)
+{
+    if (!m_manager) return;
+    static const double kRangeSeconds[] = { 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 900.0, 1800.0 };
+    if (index < 0 || index >= int(sizeof(kRangeSeconds) / sizeof(kRangeSeconds[0]))) return;
+    m_manager->setWindowLen(kRangeSeconds[index]);
+}
+
 void ChartDialog::Private::onClearShow()
 {
     if (!m_manager) return;
@@ -161,5 +170,6 @@ void ChartDialog::do_channelValues(const QList<double> &values)
 void ChartDialog::on_comboView_currentIndexChanged(int index)    { pimpl->onViewChanged(index); }
 void ChartDialog::on_comboTime_currentIndexChanged(int index)    { pimpl->onTimeChanged(index); }
 void ChartDialog::on_comboColor_currentIndexChanged(int index)   { pimpl->onColorChanged(index); }
+void ChartDialog::on_comboRange_currentIndexChanged(int index)   { pimpl->onRangeChanged(index); }
 void ChartDialog::on_btnClearShow_clicked()                      { pimpl->onClearShow(); }
 void ChartDialog::on_btnStopShow_clicked()                       { pimpl->onStopShow(); }

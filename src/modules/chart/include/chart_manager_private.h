@@ -77,6 +77,7 @@ public:
 
     // ====== 坐标轴 ======
     void setViewRange(int viewIndex, double startTime, double endTime);
+    void setWindowLen(double seconds);
     void setAbsTime(int viewIndex, bool enabled);
     void setBackColor(int viewIndex, int color);
 
