@@ -5,7 +5,7 @@
 #include <stdbool.h>
 /* LTM 通讯应用层接口 */
 
-#define LTM_CURVE_SIZE			5	/* 支持发送的曲线数 */
+#define LTM_CURVE_SIZE			12	/* 支持发送的曲线数 */
 
 typedef enum {                  /* LTM 通讯协议 支持的数据类型 */
     Data_Target = 0,            /* 目标值 */
