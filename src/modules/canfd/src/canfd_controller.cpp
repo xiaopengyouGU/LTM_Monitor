@@ -1,19 +1,7 @@
 #include "canfd_controller.h"
-#include "ControlCANFD.h"        // 厂商 SDK：third_party/zcan/include
+#include "canfd_driver.h"
 #include <QDateTime>
 
-// 厂商 ControlCANFD.h 未声明该接口，但 DLL 已导出；官方 zlgcan.h 中的定义如下：
-#ifndef ZCAN_CHANNEL_ERR_INFO
-typedef struct tagZCAN_CHANNEL_ERR_INFO {
-    UINT error_code;
-    BYTE passive_ErrData[3];
-    BYTE arLost_ErrData;
-} ZCAN_CHANNEL_ERR_INFO;
-#endif
-
-extern "C" {
-UINT FUNC_CALL ZCAN_ReadChannelErrInfo(CHANNEL_HANDLE channel_handle, ZCAN_CHANNEL_ERR_INFO *p_err_info);
-}
 #include <cstring>
 
 namespace
@@ -29,6 +17,9 @@ public:
     DEVICE_HANDLE  dev = INVALID_DEVICE_HANDLE;
     CHANNEL_HANDLE ch[2] = {INVALID_CHANNEL_HANDLE, INVALID_CHANNEL_HANDLE};
     IProperty     *prop = nullptr;
+    CanfdDriver    driver;              // 驱动加载器（QLibrary + ZCAN 函数表）
+
+    const CanfdDriver::Api &api() const { return driver.api(); }
     bool           open = false;
     QString        lastError;
     qint64         epochOffsetMs = 0;   // 设备时间 -> 主机 epoch 的偏移
@@ -101,14 +92,20 @@ bool CanfdController::open(const CanfdConfig &config)
     close();                            // 先复位，避免重复打开
     pimpl->config = config;
     pimpl->channelCount = config.channels < 1 ? 1 : (config.channels > 2 ? 2 : config.channels);
+    const QString driverError = pimpl->driver.load(config);
+    if (!driverError.isEmpty()) {
+        emit opened(false, driverError);
+        return false;
+    }
 
     // 1. 打开设备
-    pimpl->dev = ZCAN_OpenDevice(config.deviceType, config.deviceIndex, 0);
+    pimpl->dev = pimpl->api().openDevice(config.deviceType, config.deviceIndex, 0);
     if (pimpl->dev == INVALID_DEVICE_HANDLE) {
+        pimpl->driver.unload();
         emit opened(false, QString("ZCAN_OpenDevice 失败"));
         return false;
     }
-    pimpl->prop = GetIProperty(pimpl->dev);
+    pimpl->prop = pimpl->api().getIProperty(pimpl->dev);
     if (!pimpl->prop) {
         close();
         emit opened(false, QString("GetIProperty 失败"));
@@ -133,7 +130,7 @@ bool CanfdController::open(const CanfdConfig &config)
     cfg.canfd.mode = 0;
 
     for (int i = 0; i < pimpl->channelCount; i++) {
-        pimpl->ch[i] = ZCAN_InitCAN(pimpl->dev, i, &cfg);
+        pimpl->ch[i] = pimpl->api().initCan(pimpl->dev, i, &cfg);
         if (pimpl->ch[i] == INVALID_CHANNEL_HANDLE) {
             close();
             emit opened(false, QString("ZCAN_InitCAN 失败（通道 %1）").arg(i));
@@ -143,7 +140,7 @@ bool CanfdController::open(const CanfdConfig &config)
 
     // 4. 启动通道
     for (int i = 0; i < pimpl->channelCount; i++) {
-        if (ZCAN_StartCAN(pimpl->ch[i]) != STATUS_OK) {
+        if (pimpl->api().startCan(pimpl->ch[i]) != STATUS_OK) {
             close();
             emit opened(false, QString("ZCAN_StartCAN 失败（通道 %1）").arg(i));
             return false;
@@ -161,15 +158,17 @@ bool CanfdController::open(const CanfdConfig &config)
 void CanfdController::close()
 {
     if (pimpl->prop) {
-        ReleaseIProperty(pimpl->prop);
+        pimpl->api().releaseIProperty(pimpl->prop);
         pimpl->prop = nullptr;
     }
     if (pimpl->dev != INVALID_DEVICE_HANDLE) {
-        ZCAN_CloseDevice(pimpl->dev);
+        pimpl->api().closeDevice(pimpl->dev);
         pimpl->dev = INVALID_DEVICE_HANDLE;
     }
     for (auto &h : pimpl->ch)
         h = INVALID_CHANNEL_HANDLE;
+
+    pimpl->driver.unload();
 
     const bool wasOpen = pimpl->open;
     pimpl->open = false;
@@ -193,7 +192,7 @@ QString CanfdController::deviceInfo() const
         return QString();
     ZCAN_DEVICE_INFO info;
     std::memset(&info, 0, sizeof(info));
-    if (ZCAN_GetDeviceInf(pimpl->dev, &info) != STATUS_OK)
+    if (pimpl->api().getDeviceInf(pimpl->dev, &info) != STATUS_OK)
         return QString();
     return QString("%1 SN:%2")
         .arg(QString::fromLocal8Bit(reinterpret_cast<const char *>(info.str_hw_Type)))
@@ -225,7 +224,7 @@ bool CanfdController::transmit(uint8_t channel, const CanfdFrame &frame)
         if (frame_len > 0 && !frame.data.isEmpty())
             std::memcpy(d.frame.data, frame.data.constData(), frame_len);
         d.transmit_type = frame.transmitType;   // 发送方式（0=正常，2=自发自收）
-        if (ZCAN_Transmit(h, &d, 1) != 1) {
+        if (pimpl->api().transmit(h, &d, 1) != 1) {
             emit errorOccurred(QString("ZCAN_Transmit 失败"));
             return false;
         }
@@ -245,7 +244,7 @@ bool CanfdController::transmit(uint8_t channel, const CanfdFrame &frame)
     if (frame_len > 0 && !frame.data.isEmpty())
         std::memcpy(d.frame.data, frame.data.constData(), frame_len);
     d.transmit_type = frame.transmitType;   // 发送方式（0=正常，2=自发自收）
-    if (ZCAN_TransmitFD(h, &d, 1) != 1) {
+    if (pimpl->api().transmitFd(h, &d, 1) != 1) {
         emit errorOccurred(QString("ZCAN_TransmitFD 失败"));
         return false;
     }
@@ -267,10 +266,10 @@ int CanfdController::receive(int channel, QList<CanfdFrame> &frames)
     static ZCAN_ReceiveFD_Data fdBuf[kMaxBatch];
 
     // 经典 CAN 帧
-    uint32_t n = ZCAN_GetReceiveNum(h, TYPE_CAN);
+    uint32_t n = pimpl->api().getReceiveNum(h, TYPE_CAN);
     if (n > 0) {
         uint32_t want = n > kMaxBatch ? kMaxBatch : n;
-        uint32_t r = ZCAN_Receive(h, canBuf, want, 0);
+        uint32_t r = pimpl->api().receive(h, canBuf, want, 0);
         for (uint32_t i = 0; i < r; i++) {
             CanfdFrame frame;
             frame.id  = canBuf[i].frame.can_id;
@@ -283,10 +282,10 @@ int CanfdController::receive(int channel, QList<CanfdFrame> &frames)
     }
 
     // CAN-FD 帧
-    n = ZCAN_GetReceiveNum(h, TYPE_CANFD);
+    n = pimpl->api().getReceiveNum(h, TYPE_CANFD);
     if (n > 0) {
         uint32_t want = n > kMaxBatch ? kMaxBatch : n;
-        uint32_t r = ZCAN_ReceiveFD(h, fdBuf, want, 0);
+        uint32_t r = pimpl->api().receiveFd(h, fdBuf, want, 0);
         for (uint32_t i = 0; i < r; i++) {
             CanfdFrame frame;
             frame.id    = fdBuf[i].frame.can_id;
@@ -318,7 +317,7 @@ int CanfdController::receive(int channel, QList<CanfdFrame> &frames)
 bool CanfdController::isActive() const
 {
     if (!pimpl->open || !pimpl->dev)    return false;
-    uint32_t st = ZCAN_IsDeviceOnLine(pimpl->dev);
+    uint32_t st = pimpl->api().isDeviceOnLine(pimpl->dev);
     // 不同固件版本返回 STATUS_ONLINE(2) 或 STATUS_OK(1)，两者都视为在线
     return (st == STATUS_ONLINE) || (st == STATUS_OK);
 }
@@ -337,9 +336,11 @@ uint32_t CanfdController::channelErrorCode(int channel) const
 {
     if (!pimpl->open || channel >= pimpl->channelCount || pimpl->ch[channel] == INVALID_CHANNEL_HANDLE)
         return 0;
-    ZCAN_CHANNEL_ERR_INFO err;
+    if (!pimpl->api().readChannelErrInfo)
+        return 0;
+    CanfdChannelErrInfo err;
     std::memset(&err, 0, sizeof(err));
-    if (ZCAN_ReadChannelErrInfo(pimpl->ch[channel], &err) != STATUS_OK)
+    if (pimpl->api().readChannelErrInfo(pimpl->ch[channel], &err) != STATUS_OK)
         return 0;
     return err.error_code;
 }

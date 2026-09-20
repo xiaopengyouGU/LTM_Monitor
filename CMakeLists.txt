@@ -128,7 +128,8 @@ endif()
 # 都必须与可执行文件同目录，否则程序启动报缺 DLL
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/chart/third_party/QCustomPlot/qcustomplot.dll
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/canfd/third_party/zcan/ControlCANFD.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/canfd/third_party/zcan/lib/ControlCANFD.dll
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/canfd/third_party/zcan/lib/zlgcan.dll
     DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 # 如果有其他第三方 DLL，同理

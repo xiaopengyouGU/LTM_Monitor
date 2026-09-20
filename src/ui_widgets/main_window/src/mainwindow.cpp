@@ -206,11 +206,6 @@ void MainWindow::Private::buildUI_Canfd()
     ui->actUDS->setCheckable(true);
     ui->stackedWidget->setCurrentIndex(0);      // 默认图表页
 
-    // CAN-FD 设备列表（设备索引）
-    ui->comboCanfd->clear();
-    ui->comboCanfd->addItem(QString("USBCANFD_200U"));
-    ui->comboCanfd->addItem(QString("USBCAN_200U"));
-    ui->comboCanfd->addItem(QString("USBCANFD_100U"));
     setLabelColor(ui->labOperCanfd, "gray");    // 初始状态灯
 }
 
@@ -390,11 +385,17 @@ void MainWindow::Private::onBtnCanfd()
 {
     if (ui->btnCanfd->text() == "打开CAN-FD") {
         CanfdConfig config;
-        config.deviceIndex   = (uint32_t)ui->comboCanfd->currentIndex();
+        config.vendor = ui->comboVendor->currentIndex();
+        static const int kDeviceTypes[]    = { 41, 42, 4, 3 };  // 固定的映射表
+        static const int kDeviceChannels[] = { 2, 1, 2, 1 };    // 兼容周立功
+        const int selection = ui->comboIndex->currentIndex();
+        if (selection >= 0 && selection < 4) {
+            config.deviceType = kDeviceTypes[selection];
+            config.channels   = kDeviceChannels[selection];
+        }
         config.abitBaud      = parseCanfdBaud(ui->comboCanBaud->currentText());
         config.dbitBaud      = parseCanfdBaud(ui->comboCanfdBaud->currentText());
         config.canfdStandard = ui->comboStandard->currentIndex();
-        config.channels      = 2;
         canfd_manager->open(config);
     } else {
         canfd_manager->close();

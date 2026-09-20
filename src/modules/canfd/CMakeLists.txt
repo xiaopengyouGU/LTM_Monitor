@@ -11,6 +11,7 @@ set(SOURCES
     src/canfd_manager.cpp
     src/canfd_worker.cpp
     src/canfd_controller.cpp
+    src/canfd_driver.cpp
 )
 
 set(HEADERS
@@ -20,6 +21,7 @@ set(HEADERS
     include/canfd_def.h
     include/canfd_manager_private.h
     include/canfd.h
+    src/canfd_driver.h
 )
 
 # 定义动态库（需要导出宏）
@@ -35,28 +37,37 @@ target_include_directories(${PROJECT_NAME}
         $<INSTALL_INTERFACE:include>
 )
 
-# 链接 Qt 库与厂商导入库
+# 仅链接 Qt；厂商 SDK 改为运行时由 QLibrary 加载
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC  Qt::Core
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zcan/lib/libControlCANFD.a
+    PUBLIC Qt::Core
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE CANFD_LIBRARY)
 
-# 第三方库路径设置（提前暴露问题）
-set(ZCAN_IMPLIB ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zcan/lib/libControlCANFD.a)
-set(ZCAN_DLL   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zcan/ControlCANFD.dll)
+# 第三方驱动 DLL：运行时由 CanfdDriver 通过 QLibrary 加载
+set(ZCAN_DLL ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zcan/lib/ControlCANFD.dll)
+set(ZLG_DLL  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zcan/lib/zlgcan.dll)
 
-if(NOT EXISTS ${ZCAN_IMPLIB})
-    message(FATAL_ERROR "ControlCANFD import library not found: ${ZCAN_IMPLIB}")
-endif()
 if(NOT EXISTS ${ZCAN_DLL})
     message(WARNING "ControlCANFD.dll not found: ${ZCAN_DLL}, runtime may fail")
 endif()
+if(NOT EXISTS ${ZLG_DLL})
+    message(WARNING "zlgcan.dll not found: ${ZLG_DLL}, runtime may fail")
+endif()
 
-# 构建后把 DLL 拷贝到输出目录，便于运行时查找
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${ZCAN_DLL} $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    COMMENT "Copying ControlCANFD.dll to output directory"
-)
+# 构建后把驱动 DLL 拷贝到输出目录，便于运行时查找
+if(EXISTS ${ZCAN_DLL})
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${ZCAN_DLL} $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMENT "Copying ControlCANFD.dll to output directory"
+    )
+endif()
+
+if(EXISTS ${ZLG_DLL})
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${ZLG_DLL} $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMENT "Copying zlgcan.dll to output directory"
+    )
+endif()

@@ -29,6 +29,9 @@
 // 设备类型（ZCAN_USBCANFD_200U）
 enum CanfdDeviceType { CANFD_DEVICE_USBCANFD_200U = 41 };
 
+// 厂商类型（只决定首选驱动 DLL，设备类型映射与厂商无关）
+enum CanfdVendor { CANFD_VENDOR_CHUANGXIN = 0, CANFD_VENDOR_ZQWL = 1 };
+
 // 协议类型
 enum CanfdProtocol { CANFD_PROTOCOL_CAN = 0, CANFD_PROTOCOL_CANFD = 1 };
 
@@ -61,6 +64,8 @@ struct CanfdFrame
 struct CanfdConfig
 {
     uint32_t deviceIndex = 0;                      // 设备序号，默认 0
+    int      vendor = CANFD_VENDOR_CHUANGXIN;      // 厂商（优先使用对应的驱动 DLL）
+    QString  driverPath;                          // 可选：显式指定驱动 DLL 路径
     int      deviceType = CANFD_DEVICE_USBCANFD_200U;
     int      channels = 2;                         // 使用的通道数：1 或 2
     uint32_t abitBaud = 500000;                    // 仲裁段波特率
