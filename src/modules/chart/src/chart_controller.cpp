@@ -5,6 +5,24 @@
 
 // rangeChanged 有重载（单参/双参），统一强转单参版
 using RangeChangedSig = void (QCPAxis::*)(const QCPRange&);
+namespace
+{
+    // 主刻度保持 QCustomPlot 自动策略；只限制次刻度数量，避免小刻度过密。
+    class SparseSubTickTicker : public QCPAxisTicker
+    {
+    protected:
+        int getSubTickCount(double tickStep) override
+        {
+            return qMin(2, QCPAxisTicker::getSubTickCount(tickStep));
+        }
+    };
+
+    void applySparseSubTicks(QCPAxis *axis)
+    {
+        if (axis)
+            axis->setTicker(QSharedPointer<QCPAxisTicker>(new SparseSubTickTicker));
+    }
+}
 
 // ChartController：渲染层适配器。
 // QCustomPlot 仅在本文件中可见，头文件对外只暴露 QWidget*，换渲染引擎只动本文件。
@@ -90,6 +108,8 @@ ChartController::Private::Private(ChartController *owner, QWidget *parent)
     // 或移除曲线线宽），否则实时刷新卡顿会立刻复现。
     // =====================================================================
     plot->setPlottingHint(QCP::phFastPolylines);
+    applySparseSubTicks(plot->xAxis);
+    applySparseSubTicks(plot->yAxis);
 
     // 鼠标移动：上报坐标（高频，调用方自行节流）
     connect(plot, &QCustomPlot::mouseMove, owner, [this](QMouseEvent *e) {
@@ -125,6 +145,8 @@ void ChartController::Private::setViewType(ViewType type)
         specRect = new QCPAxisRect(plot);
         plot->plotLayout()->insertRow(1);
         plot->plotLayout()->addElement(1, 0, specRect);
+        applySparseSubTicks(specRect->axis(QCPAxis::atBottom));
+        applySparseSubTicks(specRect->axis(QCPAxis::atLeft));
 
         spectrumGraph = plot->addGraph(
             specRect->axis(QCPAxis::atBottom),
