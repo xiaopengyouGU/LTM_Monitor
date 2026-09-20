@@ -11,6 +11,8 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QTextStream>
+#include <QStringConverter>
+#include <memory>
 
 // ============================================================
 // 私有实现（Pimpl）：UI 与全部状态收敛于此
@@ -54,17 +56,25 @@ public:
     bool        m_hexShowMode = false;  // 16进制显示模式
     QByteArray  m_rawReceivedData;      // 保存所有接收到的原始数据（二进制）
     int         m_codec      = 0;       // 控制台编码：0=UTF-8，1=GBK
+    std::unique_ptr<QStringDecoder> m_decoder;
+    void resetDecoder()
+    {
+        m_decoder = std::make_unique<QStringDecoder>(
+            m_codec == 1 ? QStringConverter::System : QStringConverter::Utf8);
+    }
 };
 
 void ConsoleWidget::Private::setup()
 {
     ui = new Ui::ConsoleWidget;
     ui->setupUi(q);
+    resetDecoder();
 }
 
 void ConsoleWidget::Private::setCodec(int codec)
 {
     m_codec = codec;
+    resetDecoder();
 }
 
 void ConsoleWidget::Private::setInfo(const QString &msg)
@@ -94,6 +104,7 @@ void ConsoleWidget::Private::setNewLine(bool on)
 void ConsoleWidget::Private::setHexShow(bool on)
 {
     m_hexShowMode = on;
+    resetDecoder();
     updateDisplay();                            // 刷新显示
 }
 
@@ -109,6 +120,7 @@ void ConsoleWidget::Private::clear()
     font.setPointSize(11);
     ui->plainTextEdit->setFont(font);
     m_rawReceivedData.clear();
+    resetDecoder();
 }
 
 // ============================================================
@@ -189,7 +201,7 @@ void ConsoleWidget::Private::displayText(const QByteArray &data)
     if (m_hexShowMode) {
         appendText(data.toHex(' ').toUpper() + "\n");
     } else {
-        appendText(decodeTerminal(data));               // 按控制台编码解码（UTF-8 / GBK）
+        appendText(m_decoder->decode(data));            // 数据解码
     }
 }
 
@@ -248,7 +260,8 @@ void ConsoleWidget::Private::updateDisplay()
         hexStr.replace("0D 0A", "0D 0A\n");             // 应用换行规则
         appendText(hexStr);
     } else {
-        appendText(decodeTerminal(m_rawReceivedData));
+        QStringDecoder dec(m_codec == 1 ? QStringConverter::System : QStringConverter::Utf8);
+        appendText(dec.decode(m_rawReceivedData));
     }
 }
 
@@ -271,7 +284,6 @@ void ConsoleWidget::connectManager(SerialManager *manager)
 {
     pimpl->m_manager = manager;
 }
-
 
 void ConsoleWidget::setStatusBar(StatusBar *bar)     { pimpl->m_bar = bar; }
 void ConsoleWidget::setCodec(int codec)              { pimpl->setCodec(codec); }
