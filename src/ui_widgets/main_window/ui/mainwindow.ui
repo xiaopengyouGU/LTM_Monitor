@@ -22,7 +22,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>LTM_Monitor</string>
+   <string>LTM-Monitor</string>
   </property>
   <property name="windowIcon">
    <iconset resource="../../chart_dialog/img.qrc">

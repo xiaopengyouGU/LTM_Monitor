@@ -1,4 +1,4 @@
-# LTM_Monitor – 基于 Qt6 的监控调试上位机
+# LTM-Monitor – 基于 Qt6 的监控调试上位机
 
 基于 **Qt 6** 开发的监控调试上位机，支持串口 / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
 1000Hz 实时动态曲线、最大支持32通道、在线 PID 调参、CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出。

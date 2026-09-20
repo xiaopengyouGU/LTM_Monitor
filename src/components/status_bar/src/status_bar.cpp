@@ -1,4 +1,4 @@
-﻿#include "status_bar.h"
+#include "status_bar.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -20,8 +20,8 @@ public:
     void addSeparator(QBoxLayout *layout);
 
     StatusBar *status = nullptr;
-    QLabel    *labAuthor = nullptr;
     QLabel    *labWebside = nullptr;
+    QLabel    *labWelcome = nullptr;
     QLabel    *labInfo = nullptr;
     QLabel    *labTime = nullptr;
     QTimer    *timer = nullptr;
@@ -33,24 +33,24 @@ void StatusBar::Private::build()
     layout->setContentsMargins(6, 2, 6, 2);
     layout->setSpacing(15);
 
-    // 作者标签
-    labAuthor = new QLabel(status);
-    labAuthor->setMinimumWidth(100);
-    labAuthor->setText("  Lvtou (宁波)");
-    layout->addWidget(labAuthor);
-    addSeparator(layout);
-
     // 网址标签
     labWebside = new QLabel(status);
-    labWebside->setMinimumWidth(350);
-    labWebside->setText(" https://gitee.com/xiaopengyouGU/LTM_Monitor");
+    labWebside->setMinimumWidth(180);
+    labWebside->setText("  www.ltm-monitor.com ");
     layout->addWidget(labWebside, 1);
+    addSeparator(layout);
+
+    // 欢迎标签
+    labWelcome = new QLabel(status);
+    labWelcome->setMinimumWidth(240);
+    labWelcome->setText(" 欢迎使用：LTM-Monitor V0.4.3 ");
+    layout->addWidget(labWelcome, 1);
     addSeparator(layout);
 
     // 信息标签
     labInfo = new QLabel(status);
-    labInfo->setMinimumWidth(300);
-    labInfo->setText("欢迎使用: LTM_Monitor V0.3.2");
+    labInfo->setMinimumWidth(200);
+    labInfo->setText(" 作者主页：https://gitee.com/xiaopengyouGU ");
     layout->addWidget(labInfo, 3);
     addSeparator(layout);
 

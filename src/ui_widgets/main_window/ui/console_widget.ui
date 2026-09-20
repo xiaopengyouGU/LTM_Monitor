@@ -75,8 +75,13 @@
    </item>
    <item row="0" column="0" rowspan="5" colspan="2">
     <widget class="QPlainTextEdit" name="plainTextEdit">
+     <property name="font">
+      <font>
+       <pointsize>32</pointsize>
+      </font>
+     </property>
      <property name="plainText">
-      <string>Hello LTM_Monitor!!!</string>
+      <string>Hello LTM-Monitor!!!</string>
      </property>
     </widget>
    </item>

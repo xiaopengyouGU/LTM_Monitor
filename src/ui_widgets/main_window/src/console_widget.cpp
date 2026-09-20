@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QTextStream>
+#include <QTextCharFormat>
 #include <QStringConverter>
 #include <memory>
 
@@ -56,6 +57,7 @@ public:
     QByteArray  m_rawReceivedData;      // 保存所有接收到的原始数据（二进制）
     int         m_codec      = 0;       // 控制台编码：0=UTF-8，1=GBK
     std::unique_ptr<QStringDecoder> m_decoder;
+    QTextCharFormat m_defaultTextFormat;    // 后续输出默认字号（欢迎语保留 UI 大字号）
     void resetDecoder()
     {
         m_decoder = std::make_unique<QStringDecoder>(
@@ -67,6 +69,8 @@ void ConsoleWidget::Private::setup()
 {
     ui = new Ui::ConsoleWidget;
     ui->setupUi(q);
+    m_defaultTextFormat.setFontPointSize(11);
+    ui->plainTextEdit->setCurrentCharFormat(m_defaultTextFormat);
     resetDecoder();
 }
 
@@ -118,6 +122,7 @@ void ConsoleWidget::Private::clear()
     QFont font = ui->plainTextEdit->font();
     font.setPointSize(11);
     ui->plainTextEdit->setFont(font);
+    ui->plainTextEdit->setCurrentCharFormat(m_defaultTextFormat);
     m_rawReceivedData.clear();
     resetDecoder();
 }
@@ -128,7 +133,7 @@ void ConsoleWidget::Private::clear()
 void ConsoleWidget::Private::showHelp()
 {
     static const QStringList helpLines = {
-        "LTM_Monitor上位机监控调试软件 ==> 帮助指令：",
+        "LTM-Monitor上位机监控调试软件 ==> 帮助指令：",
         "1、配置好串口参数后,点击 '打开串口' 启动数据交互。",
         "2、'PID调试'页（默认）：设置 Kp/Ki/Kd、目标值等参数下发，实际值实时显示。",
         "3、'串口调试'页：切换协议（LTM/普通串口/Modbus）、定时/16进制发送、发送文件；'IAP升级'走串口 LTM 协议。",
@@ -138,7 +143,7 @@ void ConsoleWidget::Private::showHelp()
         "7、控制台可直接输入文本指令发给下位机（LTM 文本指令），'设置'菜单可切换 UTF-8/GBK 编码。",
         "8、菜单 '数据分析 → 打开日志分析器'（Ctrl+L）分析 .log/.db3；",
     };
-    ui->plainTextEdit->appendPlainText(helpLines.join("\n"));
+    appendText(helpLines.join("\n") + "\n");
 }
 
 // ============================================================
@@ -242,7 +247,7 @@ void ConsoleWidget::Private::appendText(const QString &text)
 {
     QTextCursor cursor = ui->plainTextEdit->textCursor();
     cursor.movePosition(QTextCursor::End);
-    cursor.insertText(text);
+    cursor.insertText(text, m_defaultTextFormat);
     ui->plainTextEdit->setTextCursor(cursor);
 }
 
