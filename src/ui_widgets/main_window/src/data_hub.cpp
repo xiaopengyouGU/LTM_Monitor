@@ -224,7 +224,7 @@ void DataHub::Private::sendLtm(uint8_t type, const QByteArray &data)
     } 
     if (m_serialOnline && m_serial)
         m_serial->send(frame);                  // 串口：字节直发
-    else if (m_canfd && m_canfd->isActive()) {
+    else if (m_serialProtocol == Prot_LTM && m_canfd && m_canfd->isActive()) {
         // CAN-FD：直接组装 0x100 帧（64B 分片，不经任何 canfd 协议接口）
         int off = 0;
         while (off < frame.size()) {

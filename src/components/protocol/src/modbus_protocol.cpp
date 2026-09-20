@@ -23,29 +23,30 @@ QByteArray ModbusProtocol::Private::package(const ModbusConfig &cfg, const QByte
     if (data.size() > (int)MAX_DATA_SIZE) return QByteArray();
 
     QByteArray frame;
-    // 读取帧结构：slave(1) + func(1) + startReg(2) + quantity(2) + CRC16(2)
-    // 写入帧结构：slave(1) + func(1) + startReg(2) + quantity(2) + [字节数(1)] + data(N) + CRC16(2)
-    int extraLen = 0;
-    // 写多个寄存器(0x10) 和 写多个线圈(0x0F) 都需要字节数字段  
-    uint8_t func = cfg.func;          
-    if (func > 0x04) {      // 非读取命令
-        if (func == 0x10 || func == 0x0F)   extraLen = 1;
-        frame.reserve(6 + extraLen + data.size() + 2);
-    } else {
-        frame.reserve(8);
+    const uint8_t func = cfg.func;
+    // ??0x01~0x04??slave + func + startReg(2) + quantity(2) + CRC
+    // ????0x05/0x06??slave + func + addr(2) + value(2) + CRC
+    // ????0x0F/0x10??slave + func + startReg(2) + quantity(2) + byteCount(1) + data(N) + CRC
+    if (func == 0x05 || func == 0x06) {
+        if (data.size() != 2) return QByteArray();
     }
-    // Modbus 帧组装
     frame.append(char(cfg.slave));
     frame.append(char(cfg.func));
     frame.append(char(cfg.startReg >> 8));
     frame.append(char(cfg.startReg & 0xFF));
-    frame.append(char(cfg.quantity >> 8));
-    frame.append(char(cfg.quantity & 0xFF));
-    // 对于 0x10 和 0x0F，在数据前插入字节数
-    if (cfg.func == 0x10 || cfg.func == 0x0F) {
-        frame.append(char(data.size())); // 插入字节数
+    if (func >= 0x01 && func <= 0x04) {
+        frame.append(char(cfg.quantity >> 8));
+        frame.append(char(cfg.quantity & 0xFF));
+    } else if (func == 0x05 || func == 0x06) {
+        frame.append(data);                         // ??????? 2 ???
+    } else if (func == 0x0F || func == 0x10) {
+        frame.append(char(cfg.quantity >> 8));
+        frame.append(char(cfg.quantity & 0xFF));
+        frame.append(char(data.size()));            // ???
+        frame.append(data);
+    } else {
+        return QByteArray();                        // ???????
     }
-    if (func > 0x04) frame.append(data); // 非读取命令，才添加数据
 
     const uint16_t crc = crc16_modbus((const uint8_t *)frame.constData(), (uint16_t)frame.size());
     frame.append(char(crc & 0xFF));
@@ -56,6 +57,7 @@ QByteArray ModbusProtocol::Private::package(const ModbusConfig &cfg, const QByte
 bool ModbusProtocol::Private::process(ModbusConfig &cfg, QByteArray &data)
 {
     data.clear();
+    cfg.isException = false;                        // ??????????????
     uint8_t frame[260];                             // Modbus 读响应最大 5+253=258B，留余量
     while (m_rb.available() >= HEAD_SIZE) {
         uint8_t head[HEAD_SIZE];

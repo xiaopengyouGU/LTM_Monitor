@@ -40,7 +40,6 @@ public:
     void displayText(const QByteArray &data);
     QString toHexDisplay(const QString &rawText) const;
     QString fromHexDisplay(const QString &hexDisplay) const;
-    QString decodeTerminal(const QByteArray &data) const;
     QByteArray buildSendData();
     void updateDisplay();
     void setInfo(const QString &msg);
@@ -218,11 +217,6 @@ QString ConsoleWidget::Private::fromHexDisplay(const QString &hexDisplay) const
     QString str = hexDisplay;
     str.remove(' ');                                    // 移除空格
     return QString::fromUtf8(QByteArray::fromHex(str.toUtf8()));
-}
-
-QString ConsoleWidget::Private::decodeTerminal(const QByteArray &data) const
-{
-    return (m_codec == 1) ? QString::fromLocal8Bit(data) : QString::fromUtf8(data);
 }
 
 QByteArray ConsoleWidget::Private::buildSendData()
