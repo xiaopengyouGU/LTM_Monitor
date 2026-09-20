@@ -19,7 +19,18 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 # 查找 Qt 组件
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Charts Sql SerialPort)
+# 先补一个本机 Qt 提示，使 IDE 的 CMake 解析也能找到 Qt6
+if(NOT DEFINED CMAKE_PREFIX_PATH AND DEFINED ENV{QTDIR})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+endif()
+if(NOT DEFINED Qt6_DIR)
+    foreach(_qt_hint "D:/Qt/6.5.11/mingw_64")
+        if(EXISTS "${_qt_hint}/lib/cmake/Qt6/Qt6Config.cmake")
+            list(APPEND CMAKE_PREFIX_PATH "${_qt_hint}")
+        endif()
+    endforeach()
+endif()
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Sql SerialPort)
 
 # 启用 CTest：chart 模块自带压力测试（src/modules/chart/tests），
 # 构建后可用 ctest --test-dir build -R tst_chart --output-on-failure 运行

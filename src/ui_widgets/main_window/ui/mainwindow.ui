@@ -208,7 +208,7 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="serialConfig">
        <attribute name="title">
@@ -378,6 +378,11 @@
           <item>
            <property name="text">
             <string>460800</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>500000</string>
            </property>
           </item>
           <item>

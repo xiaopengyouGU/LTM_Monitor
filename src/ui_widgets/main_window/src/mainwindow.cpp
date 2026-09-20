@@ -152,8 +152,8 @@ void MainWindow::Private::buildUI_SerialPort()
 
 void MainWindow::Private::buildUI_SerialWidgets()     // 串口调试面板 + 控制台（独立组件，直连 SerialManager）
 {
-    serial_widget = new SerialWidget;
-    console_widget      = new ConsoleWidget;
+    serial_widget  = new SerialWidget;
+    console_widget = new ConsoleWidget;
 
     serial_widget->connectManager(serial_manager);
     serial_widget->setConsole(console_widget);

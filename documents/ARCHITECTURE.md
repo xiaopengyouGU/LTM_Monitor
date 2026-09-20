@@ -1,7 +1,6 @@
 # LTM_Monitor 架构说明
 
-这份文档讲三件事：项目怎么分层、数据在线程之间怎么流、代码里有哪些约定。
-读代码之前先过一遍，比对着文件猜快很多。
+本文主要介绍LTM_Monitor项目的分层设计，数据流向和一些代码约定。读者在阅读源码之前，最好简单过一遍。
 
 ## 1. 分层
 
@@ -14,36 +13,38 @@ modules       传输层与核心能力库
                 serial / canfd / chart / record
 ```
 
-依赖只从上往下，同层之间尽量不互相依赖。components 不依赖 UI 和传输层，
+依赖关系是单向的（自上而下），同层模块间是完全解耦合的。components 不依赖 UI 和传输层，
 其中 protocol / chart_map / data_map / uds_server 是纯逻辑，可以单独编译测试。
 
-各模块职责一句话：
+各模块的职责：
 
-| 模块 | 职责 |
-|---|---|
-| modules/chart | 图表核心：DataStorage 环形存储 / ChartManager 门面 / ChartController 渲染适配 / 导入导出 / FFT / 降采样 |
-| modules/serial | 串口纯字节收发，不感知任何协议 |
-| modules/canfd | CAN-FD 纯帧收发：Controller 隔离 zcan 硬件差异，Worker 周期轮询 |
-| modules/record | 日志 + 数据库，全部异步落盘，不阻塞 UI |
-| components/protocol | LTM / Modbus 打包拆包、环形缓冲、CRC16、Modbus 主站事务器，全部 Pimpl，与介质无关 |
-| components/chart_map | 数据源信号 → 图表通道的统一映射表 |
-| components/data_map | DBC / 自定义 JSON 协议按位解码 |
-| components/uds_server | 硬件无关的 UDS 升级协议引擎（与 BootLoader 状态机镜像） |
-| components/status_bar | 状态栏控件，供各 Widget 直连注入 |
-| ui_widgets/main_window | 壳 + 全部接线；DataHub 是唯一数据中转站 |
+
+| 模块                   | 职责                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| modules/chart          | 图表核心：DataStorage 环形存储 / ChartManager 门面 / ChartController 渲染适配 / 导入导出 / FFT / 降采样 |
+| modules/serial         | 串口纯字节收发，与协议层无关                                                                            |
+| modules/canfd          | CAN-FD 纯帧收发：Controller 隔离硬件差异，Worker 周期轮询                                               |
+| modules/record         | 日志 + 数据库，全部异步操作，不阻塞 UI                                                                  |
+| components/protocol    | LTM / Modbus 打包拆包、环形缓冲、CRC16、Modbus 主站事务器，全部 Pimpl，与介质无关                       |
+| components/chart_map   | 数据源信号 → 图表通道的统一映射表                                                                      |
+| components/data_map    | DBC / 自定义 JSON 协议按位解码                                                                          |
+| components/uds_server  | 硬件无关的 UDS 升级协议引擎（与 BootLoader 状态机镜像）                                                 |
+| components/status_bar  | 状态栏控件，供各 Widget 直连注入                                                                        |
+| ui_widgets/main_window | 壳 + 全部接线；DataHub 是唯一数据中转站                                                                 |
 
 ## 2. 线程模型与数据流
 
 项目共 5 个执行上下文 + 1 个线程池：
 
-| 执行上下文 | 归属 | 职责 |
-|---|---|---|
-| UI 主线程 | MainWindow / 全部 Widget / ChartManager 刷新定时器 | 界面、绘图、广播 |
-| data_thread | DataHub | 高频数据加工与分发 |
-| 串口线程 | SerialWorker | 串口读写 |
-| CAN-FD 线程 | CanfdWorker | 20ms 周期轮询收帧（升级时切 3ms） |
-| 记录线程 | RecordWorker / LogWorker | 日志与数据库异步落盘 |
-| QtConcurrent 线程池 | ChartManager 刷新任务 | 并行取数 / 降采样 / FFT |
+
+| 执行上下文          | 归属                                               | 职责                              |
+| ------------------- | -------------------------------------------------- | --------------------------------- |
+| UI 主线程           | MainWindow / 全部 Widget / ChartManager 刷新定时器 | 界面、绘图、广播                  |
+| data_thread         | DataHub                                            | 高频数据加工与分发                |
+| 串口线程            | SerialWorker                                       | 串口读写                          |
+| CAN-FD 线程         | CanfdWorker                                        | 20ms 周期轮询收帧（升级时切 3ms） |
+| 记录线程            | RecordWorker / LogWorker                           | 日志与数据库异步落盘              |
+| QtConcurrent 线程池 | ChartManager 刷新任务                              | 并行取数 / 降采样 / FFT           |
 
 数据流全景：
 
@@ -83,8 +84,6 @@ DataHub ──addData──> ChartManager(UI线程) ──> DataStorage
 
 ## 3. 代码里的约定
 
-这些约定散落在注释里，是项目能跑起来的前提：
-
 1. **时间戳必须单调递增**。DataStorage 的环形缓冲和范围查找都依赖它，`times.last()` 就是最新时间。
    破坏单调性等于未定义行为。
 2. **每通道同一时刻只有一个写者**，就是 DataHub。读侧（刷新/导出/FFT）可以并发；读写锁只在批量导入时短暂持有。
@@ -98,20 +97,21 @@ DataHub ──addData──> ChartManager(UI线程) ──> DataStorage
 
 ## 4. 关键性能决策
 
-| 决策 | 原因 |
-|---|---|
-| 全项目 Pimpl | 头文件 = 纯接口面，编译隔离，实现细节不泄漏 |
-| DataStorage 环形缓冲预分配（20 万点/通道） | 写入 O(1)，不扩容、不搬移；超限覆盖最旧 |
-| M4 降采样首尾点单独保留、桶内极值按 x 序追加 | 桶内 min/max 乱拼会产生折返锯齿——V0.2 毛刺的根因 |
-| LTTB 上限 4500 且留 2 | 数据量限制保证容量足够，留 2 给 M4 首尾点 |
-| FFT 复用 raw.times 作虚部 | 原地变换不额外分配；N 向下取 2 的幂，幅度谱只算前半段，省近一半运算 |
-| 平均采样率由相邻时间戳估算（(n-1)/ΣΔt） | 非均匀采样下的最佳近似，rate_N 预计算避免每 bin 一次除法 |
-| 汉宁窗 ×2 补偿 | 相干增益 0.5，乘 2 后峰值幅度与矩形窗一致 |
-| 并行取数 + QFutureWatcher 异步收尾 | 每通道一个任务，主线程零阻塞，单通道失败隔离 |
-| 相对时间平移在并行任务内完成 | COW detach 发生在工作线程，主线程广播零拷贝 |
-| 导入/导出按列批量处理 | 单次加锁，避免逐点加锁 |
-| 刷新去重用 dataVersion | 无新数据时不触发全量取数 |
-| 升级轮询 20ms → 3ms | 缩短升级耗时，结束即恢复 |
+
+| 决策                                         | 原因                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| 全项目 Pimpl                                 | 头文件 = 纯接口面，编译隔离，实现细节不泄漏                         |
+| DataStorage 环形缓冲预分配（20 万点/通道）   | 写入 O(1)，不扩容、不搬移；超限覆盖最旧                             |
+| M4 降采样首尾点单独保留、桶内极值按 x 序追加 | 桶内 min/max 乱拼会产生折返锯齿——V0.2 毛刺的根因                  |
+| LTTB 上限 4500 且留 2                        | 数据量限制保证容量足够，留 2 给 M4 首尾点                           |
+| FFT 复用 raw.times 作虚部                    | 原地变换不额外分配；N 向下取 2 的幂，幅度谱只算前半段，省近一半运算 |
+| 平均采样率由相邻时间戳估算（(n-1)/ΣΔt）    | 非均匀采样下的最佳近似，rate_N 预计算避免每 bin 一次除法            |
+| 汉宁窗 ×2 补偿                              | 相干增益 0.5，乘 2 后峰值幅度与矩形窗一致                           |
+| 并行取数 + QFutureWatcher 异步收尾           | 每通道一个任务，主线程零阻塞，单通道失败隔离                        |
+| 相对时间平移在并行任务内完成                 | COW detach 发生在工作线程，主线程广播零拷贝                         |
+| 导入/导出按列批量处理                        | 单次加锁，避免逐点加锁                                              |
+| 刷新去重用 dataVersion                       | 无新数据时不触发全量取数                                            |
+| 升级轮询 20ms → 3ms                         | 缩短升级耗时，结束即恢复                                            |
 
 ## 5. 用到的设计模式
 
@@ -126,34 +126,32 @@ DataHub ──addData──> ChartManager(UI线程) ──> DataStorage
 
 总计约 **10736 行 / 84 文件**：
 
-| 分层 | 行数 | 占比 |
-|---|---|---|
-| modules | 4633 | 43% |
-| ui_widgets | 4176 | 39% |
-| components | 1911 | 18% |
-| application | 16 | 0% |
+
+| 分层        | 行数 | 占比 |
+| ----------- | ---- | ---- |
+| modules     | 4633 | 43%  |
+| ui_widgets  | 4176 | 39%  |
+| components  | 1911 | 18%  |
+| application | 16   | 0%   |
 
 大头在 modules（驱动隔离、图表性能、异步落盘）和 ui_widgets（接线 + DataHub）；
 components 行数最少，但协议解析和映射都在这。
 
-## 7. 阅读顺序
+## 7. 推荐阅读顺序
 
-1. 本文档，先把线程和数据流这张图刻进脑子。
-2. application/main.cpp，几行。
-3. ui_widgets 的头文件（只看 .h）——全是 Pimpl，头文件就是架构图，接口、信号、槽一目了然。
-4. mainwindow.cpp 的 build*() 系列——看接线，壳有多薄。
-5. data_hub.cpp——数据加工和分发都在这里。
-6. components——纯逻辑无 UI 无线程，最好读，先建立协议和映射的概念。
-7. modules/serial → modules/canfd——驱动封装 + 协议承载。
-8. modules/chart（最后读）——DataStorage（存储+降采样）→ ChartManager（门面+并行刷新）→ ChartController（渲染）。
-9. modules/record——异步落盘。
-10. chart/tests 压测——性能基线。
-
-边读边把线程时序和数据流画下来，比反复翻代码有用。
+1. application/main.cpp。
+2. ui_widgets 的头文件（只看 .h）——全是 Pimpl，头文件就是架构图，接口、信号、槽一目了然。
+3. mainwindow.cpp 的 build*() 系列——感受各模块是如何组织起来的。
+4. data_hub.cpp——数据中转站，负责原始数据加工和分发。
+5. components——各种小组件。
+6. modules/serial → modules/canfd——驱动封装 + 协议承载。
+7. modules/chart（高性能图表模块）——DataStorage（存储+降采样）→ ChartManager（门面+并行刷新）→ ChartController（渲染）。
+8. modules/record——异步日志读写。
+9. chart/tests 压测——性能基准。
 
 ## 8. 与固件端的对齐
 
-LTM_Monitor 不是孤立的上位机，和 LtMotorLib 生态严格对应：
+LTM_Monitor监控调试上位机 是 LtMotorLib 生态的重要组成部分：
 
 - **LTM 协议**：examples/protocol/（纯 C，可移植到任意 MCU），上位机 protocol 组件与固件端 ltm_commut 同构。
 - **UDS 升级**：上位机 UdsServer 与 BootLoader（LtMotorLib/BootLoader/IAP-UDS）状态机严格对齐；

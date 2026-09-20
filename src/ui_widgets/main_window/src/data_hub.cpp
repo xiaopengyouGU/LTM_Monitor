@@ -71,10 +71,10 @@ public:
     DataMap             m_dataMap;         // 数据映射表
     LtmProtocol         ltmCanfd;          // LTM-over-CANFD：0x100 载荷重组解析（components 公共组件）
     LtmProtocol         ltmSerial;         // 串口 LTM 帧解析（上层组合点）
-    int                 m_serialProtocol = Prot_LTM;   // 串口协议模式（LTM/普通/Modbus）
-    ModbusMaster       *m_modbusMaster = nullptr;      // Modbus 主站事务器（可空）
+    int                 m_serialProtocol = Prot_LTM;  // 串口协议模式（LTM/普通/Modbus）
+    ModbusMaster       *m_modbusMaster   = nullptr;   // Modbus 主站事务器（可空）
     QTimer             *m_periodLtmTimer = nullptr;   // LTM 周期发送定时器（双通道路由）
-    uint8_t             m_periodLtmType = 0;
+    uint8_t             m_periodLtmType  = 0;
     QByteArray          m_periodLtmData;
     ChartMap            m_chartMap;        // 统一图表映射表（数据源信号 → 10 槽）
     uint64_t            m_canfdDropCount = 0;      // CAN-FD 缓冲丢弃帧累计
@@ -223,7 +223,7 @@ void DataHub::Private::sendLtm(uint8_t type, const QByteArray &data)
         frame = ltmSerial.package(type, data);  // LTM 帧组装统一在上层（DataHub）
     } 
     if (m_serialOnline && m_serial)
-        m_serial->send(frame);                              // 串口：字节直发
+        m_serial->send(frame);                  // 串口：字节直发
     else if (m_canfd && m_canfd->isActive()) {
         // CAN-FD：直接组装 0x100 帧（64B 分片，不经任何 canfd 协议接口）
         int off = 0;
