@@ -5,6 +5,7 @@
 #include "chart.h"
 #include "canfd.h"
 #include "serial.h"
+#include "ethernet.h"
 #include "record.h"
 #include "canfd_widget.h"
 #include "uds_widget.h"
@@ -47,6 +48,7 @@ public:
     void buildUI_SerialPort();
     void buildUI_SerialWidgets();
     void buildUI_Canfd();
+    void buildUI_Ethernet();
     void buildRecord();
     void buildChart();
     void build_DataHub();
@@ -57,6 +59,9 @@ public:
     void doSerialPortNumChanged(const QStringList &portNum);
     void doSerialOpened(bool success, const QString &msg);
     void doSerialClose();
+    void doEthernetOpened(bool success, const QString &msg);
+    void doEthernetClosed();
+    void doEthernetError(const QString &msg);
     void doCanfdOpened(bool success, const QString &msg);
     void doCanfdClosed();
     void doCanfdError(const QString &msg);
@@ -67,6 +72,7 @@ public:
     void onBtnStart();
     void onBtnSerial();
     void onBtnCanfd();
+    void onBtnNet();
     void onBtnDataExport();
     void onBtnChartShow();
     void onBtnMode();
@@ -94,6 +100,7 @@ public:
     ConsoleWidget   *console_widget = nullptr;// 串口控制台
     PidWidget       *pid_widget = nullptr;    // PID 调试面板
     CanfdManager    *canfd_manager = nullptr; // CAN-FD 管理器
+    EthernetManager *ethernet_manager = nullptr; // 网口管理器
     ModbusMaster    *modbus_master = nullptr; // Modbus 主站事务器（数据线程）
     SerialManager   *serial_manager = nullptr;// 串口管理器
     RecordManager   *record_manager = nullptr;// 记录管理器
@@ -132,6 +139,7 @@ void MainWindow::Private::build()
     buildUI_SerialPort();               // 再构造串口
     buildUI_SerialWidgets();            // 串口调试面板 + 控制台（独立组件）
     buildUI_Canfd();                    // CAN-FD 界面配置
+    buildUI_Ethernet();                 // 网口界面配置
     build_DataHub();                    // 最后创建 数据中转站
     buildUI_Others();
 }
@@ -209,6 +217,26 @@ void MainWindow::Private::buildUI_Canfd()
     setLabelColor(ui->labOperCanfd, "gray");    // 初始状态灯
 }
 
+
+void MainWindow::Private::buildUI_Ethernet()
+{
+    ethernet_manager = new EthernetManager(main);
+
+    // 绑定网口管理器：连接状态和错误直连主窗口
+    connect(ethernet_manager, &EthernetManager::ethernetOpened, main,
+            [this](bool success, const QString &msg) { doEthernetOpened(success, msg); });
+    connect(ethernet_manager, &EthernetManager::ethernetClosed, main,
+            [this]() { doEthernetClosed(); });
+    connect(ethernet_manager, &EthernetManager::ethernetError, main,
+            [this](const QString &msg) { doEthernetError(msg); });
+    ethernet_manager->start();
+
+    ui->comboNetLocalIp->clear();
+    ui->comboNetLocalIp->addItem("自动");
+    ui->comboNetLocalIp->addItems(EthernetManager::localAddresses());
+    setLabelColor(ui->labOperNet, "gray");
+}
+
 void MainWindow::Private::buildRecord()                  // 日志与数据库创建
 {
     record_manager = new RecordManager(main);
@@ -261,11 +289,13 @@ void MainWindow::Private::build_DataHub()             // 创建数据中转站
     data_thread = new QThread(main);
     data_hub->moveToThread(data_thread);     // 中转站对象移动到数据线程
     data_hub->setManager(chart_manager);     // 设置图表管理器
-    data_hub->setSendChannels(serial_manager, canfd_manager);   // 发送路由注入：串口优先，否则 CAN-FD 0x100
+    data_hub->setSendChannels(serial_manager, canfd_manager, ethernet_manager);   // 发送路由注入：串口优先，其次网口，最后 CAN-FD 0x100
 
     // 负责高频信号中转，极大减轻 UI主线程数据处理压力，避免界面卡顿。
     // 串口管理器的高频信号中转
     connect(serial_manager, &SerialManager::serialDataUpdated, data_hub, &DataHub::do_serialDataUpdated);
+    connect(ethernet_manager, &EthernetManager::ethernetDataUpdated, data_hub, &DataHub::do_ethernetDataUpdated);
+    connect(ethernet_manager, &EthernetManager::ethernetOnlineChanged, data_hub, &DataHub::setEthernetOnline);
     connect(data_hub,       &DataHub::channelActualChanged, m_dialog, &ChartDialog::do_channelValues);   // 中转站 -> 图表控制器实际值
     connect(data_hub,       &DataHub::textOrCMDReceived,    main,
             [this](uint8_t type, const QString &str, const QByteArray &data) {
@@ -400,6 +430,53 @@ void MainWindow::Private::onBtnCanfd()
     } else {
         canfd_manager->close();
     }
+}
+
+void MainWindow::Private::onBtnNet()
+{
+    if (ui->btnNet->text() == "打开网口") {
+        EthernetConfig config;
+        config.host = ui->editNetIp->text().trimmed();
+        config.port = (quint16)ui->spinNetPort->value();
+
+        const QString localAddress = ui->comboNetLocalIp->currentText();
+        if (localAddress != "自动")
+            config.localAddress = localAddress;
+
+        ethernet_manager->open(config);
+    } else {
+        ethernet_manager->close();
+    }
+}
+
+void MainWindow::Private::doEthernetOpened(bool success, const QString &msg)
+{
+    m_status->setInfo(msg);
+    if (success) {
+        setLabelColor(ui->labOperNet, "green");
+        ui->btnNet->setText("关闭网口");
+        QMessageBox::information(main, "信息", msg);
+        LOG_INFO("网口打开成功");
+    } else {
+        setLabelColor(ui->labOperNet, "red");
+        ui->btnNet->setText("打开网口");
+        QMessageBox::critical(main, "错误", msg);
+        LOG_ERROR("网口打开失败");
+    }
+}
+
+void MainWindow::Private::doEthernetClosed()
+{
+    const QString msg = "网口连接已断开";
+    setLabelColor(ui->labOperNet, "gray");
+    ui->btnNet->setText("打开网口");
+    m_status->setInfo(msg);
+}
+
+void MainWindow::Private::doEthernetError(const QString &msg)
+{
+    LOG_ERROR(QString("Ethernet ") + msg);
+    m_status->setInfo(msg);
 }
 
 void MainWindow::Private::doCanfdOpened(bool success, const QString &msg)
@@ -601,6 +678,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), pimpl(new Private
 MainWindow::~MainWindow()                   { delete pimpl; }
 void MainWindow::on_btnSerial_clicked()     { pimpl->onBtnSerial(); }
 void MainWindow::on_btnCanfd_clicked()      { pimpl->onBtnCanfd(); }
+void MainWindow::on_btnNet_clicked()       { pimpl->onBtnNet(); }
 void MainWindow::on_btnDataExport_clicked() { pimpl->onBtnDataExport(); }
 void MainWindow::on_btnChartShow_clicked()  { pimpl->onBtnChartShow(); }
 void MainWindow::on_btnStart_clicked()      { pimpl->onBtnStart(); }

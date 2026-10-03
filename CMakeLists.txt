@@ -30,7 +30,7 @@ if(NOT DEFINED Qt6_DIR)
         endif()
     endforeach()
 endif()
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Sql SerialPort)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Sql SerialPort Network)
 
 # 启用 CTest：chart 模块自带压力测试（src/modules/chart/tests），
 # 构建后可用 ctest --test-dir build -R tst_chart --output-on-failure 运行
@@ -71,6 +71,7 @@ set(MODULE_TARGETS
     chart
     serial
     canfd
+    ethernet
     record
     protocol
     data_map
@@ -99,6 +100,7 @@ endforeach()
 install(DIRECTORY src/modules/chart/include/ DESTINATION include/chart)
 install(DIRECTORY src/modules/serial/include/ DESTINATION include/serial)
 install(DIRECTORY src/modules/canfd/include/ DESTINATION include/canfd)
+install(DIRECTORY src/modules/ethernet/include/ DESTINATION include/ethernet)
 install(DIRECTORY src/modules/record/include/ DESTINATION include/record)
 install(DIRECTORY src/components/data_map/include/ DESTINATION include/data_map)
 install(DIRECTORY src/components/protocol/include/ DESTINATION include/protocol)

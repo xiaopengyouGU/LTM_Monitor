@@ -16,6 +16,7 @@ public:
 private slots:
     void on_btnSerial_clicked();                    // 打开 串口
     void on_btnCanfd_clicked();                     // 打开 CAN-FD
+    void on_btnNet_clicked();                       // 打开 网口
     void on_btnDataExport_clicked();                // CSV数据格式导出
     void on_btnChartShow_clicked();                 // 打开图表控制器
 

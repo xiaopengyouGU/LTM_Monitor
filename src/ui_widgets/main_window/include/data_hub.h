@@ -13,6 +13,7 @@ class ChartManager;                   // 前向声明，提高编译速度
 class ChartMap;
 class SerialManager;
 class CanfdManager;
+class EthernetManager;
 class ModbusMaster;
 
 // 这个对象负责处理数据采样线程发送的高频数据，运行在独立线程中，
@@ -34,8 +35,9 @@ public:
     bool loadCanfdProtocol(const QString &filePath, QString *error = nullptr); // 加载 DBC / JSON 协议
     void clearCanfd();                                        // 清空缓冲与保持值
     void setUpgradeMode(bool on);                             // UDS 升级模式：旁路表格显示/图表解码，仅转发原始帧
-    void setSendChannels(SerialManager *serial, CanfdManager *canfd);  // 发送通道注入（路由用）
+    void setSendChannels(SerialManager *serial, CanfdManager *canfd, EthernetManager *ethernet);  // 发送通道注入（路由用）
     void setSerialOnline(bool on);                            // 串口在线状态（主窗口同步）
+    void setEthernetOnline(bool on);                          // 网口在线状态（主窗口同步）
     void sendLtm(uint8_t type, const QByteArray &data);       // 统一发送数据（支持LTM和普通串口）：串口优先，否则 CAN-FD 0x100（LTM-over-CANFD）
     void setSerialProtocol(int type);                         // 串口协议模式（Prot_LTM / Prot_Common / Prot_Modbus）
     void setModbusMaster(ModbusMaster *master);               // Modbus 主站事务器挂接
@@ -44,6 +46,7 @@ public:
 
 public slots:
     void do_serialDataUpdated(const QByteArray &bytes);         // 串口接收原始字节（上层组合解析）
+    void do_ethernetDataUpdated(const QByteArray &bytes);       // 网口接收原始字节（上层组合解析）
     void do_canfdDataUpdated(const QList<CanfdFrame> &frames);  // CAN-FD 帧入站（先缓冲，不直接处理）
     void do_canfdFramesSent(const QList<CanfdFrame> &frames);   // CAN-FD 已发送帧入站（Tx 回显）
 

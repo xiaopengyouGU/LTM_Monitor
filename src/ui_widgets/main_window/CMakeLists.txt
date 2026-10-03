@@ -56,6 +56,7 @@ target_link_libraries(${PROJECT_NAME}   PUBLIC
         chart
         serial
         canfd
+        ethernet
         record
         protocol
         data_map

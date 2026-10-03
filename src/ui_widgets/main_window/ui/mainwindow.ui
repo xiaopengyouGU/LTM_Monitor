@@ -208,7 +208,7 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="serialConfig">
        <attribute name="title">
@@ -776,6 +776,113 @@
        <attribute name="title">
         <string>网口</string>
        </attribute>
+       <layout class="QGridLayout" name="gridLayoutNet" rowstretch="1,1,1,1,1,1" columnstretch="1,2">
+        <item row="0" column="0">
+         <widget class="QLabel" name="labNetName">
+          <property name="text">
+           <string>设备名</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="editNetName">
+          <property name="text">
+           <string>电机测试台</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="labNetIp">
+          <property name="text">
+           <string>设备IP</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="editNetIp">
+          <property name="placeholderText">
+           <string>192.168.1.100</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="labNetPort">
+          <property name="text">
+           <string>端口号</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QSpinBox" name="spinNetPort">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>65535</number>
+          </property>
+          <property name="value">
+           <number>5000</number>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="labNetLocalIp">
+          <property name="text">
+           <string>本机IP</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QComboBox" name="comboNetLocalIp">
+          <item>
+           <property name="text">
+            <string>自动</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="labNetProtocol">
+          <property name="text">
+           <string>协议</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QComboBox" name="comboNetProtocol">
+          <item>
+           <property name="text">
+            <string>TCP/IP</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>UDP</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="labOperNet">
+          <property name="text">
+           <string>操作</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QPushButton" name="btnNet">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>25</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>打开网口</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>

@@ -3,6 +3,7 @@
 #include "chart.h"
 #include "serial.h"
 #include "canfd.h"
+#include "ethernet.h"
 #include "data_map.h"
 #include "chart_map.h"
 #include "ltm_protocol.h"
@@ -44,8 +45,9 @@ public:
     bool loadCanfdProtocol(const QString &filePath, QString *error);
     void clearCanfd();
     void setUpgradeMode(bool on) { m_canUpgradeMode = on; }     // 仅 data_thread 访问（槽运行在工作线程）
-    void setSendChannels(SerialManager *serial, CanfdManager *canfd) { m_serial = serial; m_canfd = canfd; }
+    void setSendChannels(SerialManager *serial, CanfdManager *canfd, EthernetManager *ethernet) { m_serial = serial; m_canfd = canfd; m_ethernet = ethernet; }
     void setSerialOnline(bool on) { m_serialOnline = on; }
+    void setEthernetOnline(bool on) { m_ethernetOnline = on; }
     void setSerialProtocol(int type) { m_serialProtocol = type; }
     void setModbusMaster(ModbusMaster *master) { m_modbusMaster = master; }
     void sendLtm(uint8_t type, const QByteArray &data);
@@ -54,10 +56,11 @@ public:
     void do_periodLtmTimeout();
 
     void do_serialDataUpdated(const QByteArray &bytes);
+    void do_ethernetDataUpdated(const QByteArray &bytes);
     void do_canfdDataUpdated(const QList<CanfdFrame> &frames);
     void do_canfdFramesSent(const QList<CanfdFrame> &frames);
     void do_canfdDrain();                                       // 排水：解码并写入图表
-    void handleLtmFrame(uint8_t type, const QByteArray &data, qint64 canfdTsUs = -1);  // LTM 帧统一处理；CAN-FD 传设备 µs 时间戳，串口传 -1
+    void handleLtmFrame(uint8_t type, const QByteArray &data, qint64 canfdTsUs = -1, bool ethernetSource = false);  // LTM 帧统一处理；网口使用独立主机时间基准
     void drainToChart(const QList<DataMapDecodedSignal> &sigs, qint64 tsUs, quint64 sourceKey);
 
     DataHub *hub = nullptr;
@@ -71,6 +74,7 @@ public:
     DataMap             m_dataMap;         // 数据映射表
     LtmProtocol         ltmCanfd;          // LTM-over-CANFD：0x100 载荷重组解析（components 公共组件）
     LtmProtocol         ltmSerial;         // 串口 LTM 帧解析（上层组合点）
+    LtmProtocol         ltmEthernet;       // 网口 LTM 帧解析（与串口状态隔离）
     int                 m_serialProtocol = Prot_LTM;  // 串口协议模式（LTM/普通/Modbus）
     ModbusMaster       *m_modbusMaster   = nullptr;   // Modbus 主站事务器（可空）
     QTimer             *m_periodLtmTimer = nullptr;   // LTM 周期发送定时器（双通道路由）
@@ -81,12 +85,16 @@ public:
     bool                m_canUpgradeMode = false;  // UDS 升级模式（仅 data_thread 访问）
     SerialManager      *m_serial = nullptr;        // 发送路由：串口（主窗口注入）
     CanfdManager       *m_canfd = nullptr;         // 发送路由：CAN-FD（主窗口注入）
+    EthernetManager    *m_ethernet = nullptr;      // 发送路由：网口（主窗口注入）
     bool                m_serialOnline = false;    // 串口在线状态（主窗口同步）
+    bool                m_ethernetOnline = false;  // 网口在线状态（主窗口同步）
     qint64              m_baseUs = -1;     // CANFD 相对时间基准（设备 µs）：首帧到达时刻，图表不再用 Epoch
 
     // 节流/时间状态
     double              m_serialMyTime = 0.0;      // 串口帧内部时间（多通道同步）
     double              m_serialFrameLastMs = -1.0;// 上一帧真实到达时刻（ms），时间戳钳制基准
+    double              m_netMyTime = 0.0;         // 网口帧内部时间（与串口隔离）
+    double              m_netFrameLastMs = -1.0;   // 网口上一帧真实到达时刻（ms）
     double              m_serialTsLast = 0.0;      // 串口实际值节流时间戳
     double              m_canTsLast    = 0.0;      // CAN-FD 实际值节流时间戳
 };
@@ -126,8 +134,9 @@ bool DataHub::loadCanfdProtocol(const QString &filePath, QString *error) { retur
 void DataHub::clearCanfd()                          { pimpl->clearCanfd(); }
 void DataHub::setUpgradeMode(bool on)               { pimpl->setUpgradeMode(on); }
 
-void DataHub::setSendChannels(SerialManager *serial, CanfdManager *canfd) { pimpl->setSendChannels(serial, canfd); }
+void DataHub::setSendChannels(SerialManager *serial, CanfdManager *canfd, EthernetManager *ethernet) { pimpl->setSendChannels(serial, canfd, ethernet); }
 void DataHub::setSerialOnline(bool on)              { pimpl->setSerialOnline(on); }
+void DataHub::setEthernetOnline(bool on)            { pimpl->setEthernetOnline(on); }
 void DataHub::setSerialProtocol(int type)           { pimpl->setSerialProtocol(type); }
 void DataHub::setModbusMaster(ModbusMaster *master) { pimpl->setModbusMaster(master); }
 void DataHub::startPeriodSendLtm(uint8_t type, const QByteArray &data, int intervalMs)
@@ -136,13 +145,14 @@ void DataHub::stopPeriodSendLtm() { pimpl->stopPeriodSendLtm(); }
 void DataHub::sendLtm(uint8_t type, const QByteArray &data) { pimpl->sendLtm(type, data); }
 
 void DataHub::do_serialDataUpdated(const QByteArray &bytes)       { pimpl->do_serialDataUpdated(bytes); }
+void DataHub::do_ethernetDataUpdated(const QByteArray &bytes)     { pimpl->do_ethernetDataUpdated(bytes); }
 void DataHub::do_canfdDataUpdated(const QList<CanfdFrame> &frames){ pimpl->do_canfdDataUpdated(frames); }
 void DataHub::do_canfdFramesSent(const QList<CanfdFrame> &frames) { pimpl->do_canfdFramesSent(frames); }
 
 // ============================================================
 // 私有实现细节
 // ============================================================
-void DataHub::Private::handleLtmFrame(uint8_t type, const QByteArray &data, qint64 canfdTsUs)
+void DataHub::Private::handleLtmFrame(uint8_t type, const QByteArray &data, qint64 canfdTsUs, bool ethernetSource)
 {
     switch (type)
     {
@@ -161,12 +171,20 @@ void DataHub::Private::handleLtmFrame(uint8_t type, const QByteArray &data, qint
 
             // 帧时间戳：
             //   CAN-FD（canfdTsUs >= 0）：用设备 µs 高精度时间戳（相对基准 m_baseUs）
-            //   串口：2.5ms 钳制推进（readAll 多帧伪间隔保证单调）
+            //   串口/网口：2.5ms 钳制推进（各自独立基准，避免传输通道互相污染）
             double frameTime;
             if (canfdTsUs >= 0) {
                 if (m_baseUs < 0 && canfdTsUs > 0)
                     m_baseUs = canfdTsUs;                       // 首帧设备时间戳即零点
                 frameTime = (canfdTsUs > 0 && m_baseUs >= 0) ? double(canfdTsUs - m_baseUs) / 1e6 : -1.0;
+            } else if (ethernetSource) {
+                frameTime = m_netMyTime;                        // 当前帧时间（推进前）
+                if (m_netFrameLastMs >= 0) {
+                    double dt = ts_now - m_netFrameLastMs;
+                    if (dt < 2.5) dt = 2.5;
+                    m_netMyTime += dt / 1000.0;
+                }
+                m_netFrameLastMs = ts_now;
             } else {
                 frameTime = m_serialMyTime;                     // 当前帧时间（推进前）
                 if (m_serialFrameLastMs >= 0) {
@@ -217,13 +235,15 @@ void DataHub::Private::handleLtmFrame(uint8_t type, const QByteArray &data, qint
 
 void DataHub::Private::sendLtm(uint8_t type, const QByteArray &data)
 {
-    /* 路由：串口在线优先（既有行为），否则 CAN-FD 0x100（LTM-over-CANFD） */
+    /* 路由：串口在线优先，其次网口，最后 CAN-FD 0x100（LTM-over-CANFD） */
     QByteArray frame = data;                    // 非 LTM 协议，则发送原始数据
-    if (m_serialProtocol == Prot_LTM) {
+    if (m_serialProtocol == Prot_LTM || m_ethernetOnline) {
         frame = ltmSerial.package(type, data);  // LTM 帧组装统一在上层（DataHub）
-    } 
+    }
     if (m_serialOnline && m_serial)
         m_serial->send(frame);                  // 串口：字节直发
+    else if (m_ethernetOnline && m_ethernet)
+        m_ethernet->send(frame);                // 网口：TCP 字节直发
     else if (m_serialProtocol == Prot_LTM && m_canfd && m_canfd->isActive()) {
         // CAN-FD：直接组装 0x100 帧（64B 分片，不经任何 canfd 协议接口）
         int off = 0;
@@ -280,6 +300,16 @@ void DataHub::Private::do_serialDataUpdated(const QByteArray &bytes)
             handleLtmFrame(type, data);            // 与 CAN-FD 封装共用同一处理路径
         break;
     }
+}
+
+void DataHub::Private::do_ethernetDataUpdated(const QByteArray &bytes)
+{
+    // 网口当前按 LTM/TCP 处理，使用独立解析实例，避免与串口残帧互相污染
+    ltmEthernet.receive(bytes);
+    uint8_t type;
+    QByteArray data;
+    while (ltmEthernet.process(type, data))
+        handleLtmFrame(type, data, -1, true);
 }
 
 /********************************** CAN-FD 中转 ************************************/
