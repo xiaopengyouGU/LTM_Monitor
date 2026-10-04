@@ -7,7 +7,7 @@
 #include <QPair>
 #include <QString>
 #include <QWidget>
-#include "chart_manager.h"      // ViewType（定义在 ChartManager 头中，保持不动）
+#include "chart_manager.h"      // ViewType（定义在 ChartManager 头中）
 
 #if defined(CHART_LIBRARY)
 #  define CHART_EXPORT Q_DECL_EXPORT
@@ -34,6 +34,7 @@ public:
     // ====== 数据更新 ======
     void updateData(int channel, const QList<double>& x, const QList<double>& y);
     void updateSpectrum(const QList<double>& freq, const QList<double>& mag);
+    void setXYData(const QList<double>& xValues, const QList<double>& yValues);
 
     // ====== 通道管理 ======
     void addChannel(int channel, const QString& name = QString(), const QColor& color = Qt::red);

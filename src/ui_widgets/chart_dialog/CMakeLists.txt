@@ -34,3 +34,5 @@ target_link_libraries(${PROJECT_NAME}   PUBLIC
 
 # 添加资源文件
 target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/img.qrc)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE CHART_DIALOG_LIBRARY)

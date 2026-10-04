@@ -44,6 +44,7 @@ public:
     void setChannelColor(int channel, const QColor &color);
     void setChannelValue(int channel, double value, bool valid);
     void setChannelVisible(int channel, bool visible);
+    bool isChannelVisible(int channel) const;
 
     ChannelListWidget *w = nullptr;
     QHash<int, QListWidgetItem*> m_items;   // 通道号 -> 行
@@ -174,6 +175,13 @@ void ChannelListWidget::Private::setChannelVisible(int channel, bool visible)
     chk->blockSignals(false);
 }
 
+bool ChannelListWidget::Private::isChannelVisible(int channel) const
+{
+    QListWidgetItem *item = itemOf(channel);
+    QCheckBox *chk = item ? w->itemWidget(item)->findChild<QCheckBox *>(kVisibleChk) : nullptr;
+    return chk && chk->isChecked();
+}
+
 // ============================================================
 // 公共接口：委托给私有实现
 // ============================================================
@@ -201,3 +209,4 @@ void ChannelListWidget::setChannelName(int channel, const QString &name)  { pimp
 void ChannelListWidget::setChannelColor(int channel, const QColor &color) { pimpl->setChannelColor(channel, color); }
 void ChannelListWidget::setChannelValue(int channel, double value, bool valid) { pimpl->setChannelValue(channel, value, valid); }
 void ChannelListWidget::setChannelVisible(int channel, bool visible)      { pimpl->setChannelVisible(channel, visible); }
+bool ChannelListWidget::isChannelVisible(int channel) const             { return pimpl->isChannelVisible(channel); }

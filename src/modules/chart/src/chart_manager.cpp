@@ -203,10 +203,11 @@ void ChartManager::Private::setViewChannels(int viewIndex, const QList<int>& cha
     }
     ChartController *ctrl = controllers[viewIndex];
     ctrl->setChannels(valid);
-    for (int ch : valid)
-        ctrl->setChannelName(ch, m_channelNames[ch]);      // 新建曲线也带当前通道名
-    for (int ch : valid)
-        ctrl->setChannelColor(ch, getChannelColor(ch));     // 默认颜色，可再 setChannelColor 覆盖
+    for (int ch : valid) {
+        ctrl->setChannelName(ch, m_channelNames[ch]);      // 曲线带当前通道名
+        ctrl->setChannelColor(ch, getChannelColor(ch));    // 默认颜色
+        ctrl->setChannelVisible(ch, m_channelVisible.value(ch, true));   // 新映射继承全局可见性
+    }
     m_forceRefresh = true;
     updateData();
 }
@@ -311,7 +312,7 @@ void ChartManager::Private::updateData()
     QSet<int> needShiftChannels;
     for (const ViewSnapshot &s : qAsConst(snaps)) {
         const bool isSpec = (s.type == View_Spectrum || s.type == View_WaveformSpectrum);
-        const bool isTime = (s.type == View_Waveform || s.type == View_WaveformSpectrum);
+        const bool isTime = (s.type == View_Waveform || s.type == View_WaveformSpectrum || s.type == View_QuadGrid);
         for (int ch : s.channels) {
             if (!m_channelVisible.value(ch, true))   continue;   // 只处理可见通道（V0.2 同款，快速数据不卡）
             if (!channels.contains(ch))
@@ -450,7 +451,7 @@ void ChartManager::Private::broadcastResults(const QList<ParallelResult>& result
         for (int vi = 0; vi < n; ++vi) {
             const ViewSnapshot &s = snaps[vi];
             if (s.ctrl != reinterpret_cast<quintptr>(controllers[vi]))   continue;
-            if (s.type == View_Spectrum)   continue;   // 纯频谱视图只收频谱，不画波形
+            if (s.type == View_Spectrum || s.type == View_XY)   continue;   // 频谱/XY 单独批量投递
             if (!s.channels.contains(data.channel))   continue;
             ChartController *ctrl = controllers[vi];
             if (!s.absTime)
@@ -460,13 +461,29 @@ void ChartManager::Private::broadcastResults(const QList<ParallelResult>& result
         }
     }
 
+
+    // XY 视图：整批结果齐备后只提交一次，避免同一批内出现“新 X + 旧 Y”的半更新画面。
+    for (int vi = 0; vi < n; ++vi) {
+        const ViewSnapshot &s = snaps[vi];
+        if (s.type != View_XY || s.channels.size() < 2)   continue;
+
+        const ChannelData *xData = nullptr;
+        const ChannelData *yData = nullptr;
+        for (const ParallelResult &r : results) {
+            if (r.data.channel == s.channels.at(0))   xData = &r.data;
+            if (r.data.channel == s.channels.at(1))   yData = &r.data;
+        }
+        if (xData && yData)
+            controllers[vi]->setXYData(xData->values, yData->values);
+    }
+
     // 频谱视图：取绑定通道的频谱缓冲，零拷贝广播（多视图共享同一份）
     for (const ParallelResult &r : results) {
         if (!r.spectrum || r.spectrum->times.isEmpty())   continue;
         const int ch = r.spectrum->channel;
         for (int vi = 0; vi < n; ++vi) {
             const ViewSnapshot &s = snaps[vi];
-            if (s.ctrl != reinterpret_cast<quintptr>(controllers[vi]))   continue;
+            if (s.ctrl != reinterpret_cast<quintptr>(controllers[vi]))       continue;
             if (s.type != View_Spectrum && s.type != View_WaveformSpectrum)  continue;
             if (!s.channels.contains(ch))   continue;
             controllers[vi]->updateSpectrum(r.spectrum->times, r.spectrum->values);
@@ -510,21 +527,28 @@ void ChartManager::Private::computeFFTInto(ChannelData &out, int channel, int nf
     if (dtSum > 0.0)
         rate_N = (n - 1) / dtSum / N;
 
-    // 汉宁窗：抑制频谱泄漏；相干增益 0.5，乘 2 补偿，峰值幅度与矩形窗一致
+    // 汉宁窗 + 标准单边幅值归一化：
+    // N * CG = sum(w)，因此预计算 1/sum(w) 和 2/sum(w)，循环内只做乘法。
     const double _2_PI = 2.0 * std::acos(-1.0);
+    double windowSum = 0.0;
     for (int i = 0; i < n; ++i) {
         const double w = 0.5 * (1.0 - std::cos(_2_PI * i / (n - 1)));
-        raw.values[i] *= w * 2.0;
+        windowSum += w;
+        raw.values[i] *= w;
     }
 
     fft_real(raw.values, raw.times, N);                         // 原地 FFT：复用 raw.times 作虚部，不额外分配内存
 
+    const double invWindowSum = (windowSum > 0.0) ? (1.0 / windowSum) : 0.0;
+    const double oneSidedScale = 2.0 * invWindowSum;            // 非 DC/Nyquist 频点的单边幅值系数
+
     out.channel = channel;
-    out.times.resize(N / 2);
-    out.values.resize(N / 2);
-    for (int i = 0; i < N / 2; ++i) {
-        out.times[i]  = i * rate_N;
-        out.values[i] = raw.values[i];                          // 线性幅值（无参考幅值，不做 dB）
+    out.times.resize(N / 2 + 1);                                // 标准单边谱包含 DC 到 Nyquist
+    out.values.resize(N / 2 + 1);
+    for (int i = 0; i <= N / 2; ++i) {
+        out.times[i] = i * rate_N;
+        const bool edgeBin = (i == 0 || i == N / 2);            // DC/Nyquist 不乘 2
+        out.values[i] = raw.values[i] * (edgeBin ? invWindowSum : oneSidedScale);
     }
 }
 

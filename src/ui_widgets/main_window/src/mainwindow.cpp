@@ -1,4 +1,4 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
 #include "status_bar.h"
@@ -21,7 +21,6 @@
 #include <cstring>
 #include <QThread>
 #include <QMessageBox>
-#include <QVBoxLayout>
 #include <QStackedLayout>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -54,6 +53,8 @@ public:
     void build_DataHub();
     void buildUI_Others();
 
+    void showChartPage(int viewIndex);                 // 切到指定图表视图页
+
     // 槽实现（外层槽委托到这里）
     void doExportFinished(bool success, const QString &msg);
     void doSerialPortNumChanged(const QStringList &portNum);
@@ -69,6 +70,8 @@ public:
     void doCanfdBusError(uint32_t errCode, int channel);
     void doCanfdDropped(int dropped, uint64_t total);
     void doTextOrCMDReceived(uint8_t type, const QString &str, const QByteArray &data);
+    void doIapUpgrade();
+    // 控件操作转发
     void onBtnStart();
     void onBtnSerial();
     void onBtnCanfd();
@@ -86,28 +89,32 @@ public:
     void onActUDS(bool checked);
     void onActTerminalUtf8();
     void onActTerminalGbk();
-    void doIapUpgrade();
 
     MainWindow *main = nullptr;
 
-    Ui::MainWindow *ui = nullptr;
-    StatusBar       *m_status = nullptr;      // 自定义状态栏
-    ChartManager    *chart_manager = nullptr; // 图表管理器
-    ChartDialog     *m_dialog = nullptr;      // 图表控制对话框
-    CanfdWidget     *canfd_widget = nullptr;
-    UdsWidget       *uds_widget = nullptr;
-    SerialWidget    *serial_widget = nullptr; // 串口调试控制面板
-    ConsoleWidget   *console_widget = nullptr;// 串口控制台
-    PidWidget       *pid_widget = nullptr;    // PID 调试面板
-    CanfdManager    *canfd_manager = nullptr; // CAN-FD 管理器
-    EthernetManager *ethernet_manager = nullptr; // 网口管理器
-    ModbusMaster    *modbus_master = nullptr; // Modbus 主站事务器（数据线程）
-    SerialManager   *serial_manager = nullptr;// 串口管理器
-    RecordManager   *record_manager = nullptr;// 记录管理器
-    qint64           m_canfdDropLastShowMs = 0;   // CANFD 丢帧显示节流时刻
-    LogAnalysis     *log_analysis = nullptr;  // 日志分析器
-    QThread         *data_thread = nullptr;   // 数据中转站线程
-    DataHub         *data_hub = nullptr;      // 数据中转站
+    Ui::MainWindow *ui              = nullptr;
+    // 界面控件
+    StatusBar       *m_status       = nullptr;   // 自定义状态栏
+    ChartDialog     *m_dialog       = nullptr;   // 图表控制对话框
+    CanfdWidget     *canfd_widget   = nullptr;
+    UdsWidget       *uds_widget     = nullptr;
+    SerialWidget    *serial_widget  = nullptr;   // 串口调试控制面板
+    ConsoleWidget   *console_widget = nullptr;   // 串口控制台
+    PidWidget       *pid_widget     = nullptr;   // PID 调试面板
+    LogAnalysis     *log_analysis   = nullptr;   // 日志分析器
+    // 管理器对象
+    ChartManager    *chart_manager  = nullptr;   // 图表管理器
+    CanfdManager    *canfd_manager  = nullptr;   // CAN-FD 管理器
+    EthernetManager *ether_manager  = nullptr;   // 网口管理器
+    ModbusMaster    *modbus_master  = nullptr;   // Modbus 主站事务器（数据线程）
+    SerialManager   *serial_manager = nullptr;   // 串口管理器
+    RecordManager   *record_manager = nullptr;   // 记录管理器
+    // 中转站与工作线程
+    QThread         *data_thread    = nullptr;   // 数据中转站线程
+    DataHub         *data_hub       = nullptr;   // 数据中转站
+    QList<QWidget*>  m_chartPages;               // 图表视图号 -> 页面控件（下标即 viewIndex，buildChart 登记）
+    int              m_chartViewIndex = 0;       // 最后选择的图表视图
+    qint64           m_canfdDropLastShowMs = 0;  // CANFD 丢帧显示节流时刻
 };
 
 MainWindow::Private::~Private()
@@ -153,7 +160,7 @@ void MainWindow::Private::buildUI_SerialPort()
             [this](bool success, const QString &msg) { doSerialOpened(success, msg); });
     connect(serial_manager, &SerialManager::serialClose, main, [this]() { doSerialClose(); });
     connect(serial_manager, &SerialManager::serialPortNumChanged, main,
-            [this](const QStringList &portNum) { doSerialPortNumChanged(portNum); });
+            [this](const QStringList &portNum)       { doSerialPortNumChanged(portNum); });
     // 启动串口管理器
     serial_manager->start();
 }
@@ -168,8 +175,7 @@ void MainWindow::Private::buildUI_SerialWidgets()     // 串口调试面板 + �
     console_widget->connectManager(serial_manager);
 
     // 控制台发送按钮 → 面板直发（含 Modbus 检查与周期发送）
-    connect(console_widget, &ConsoleWidget::sendRequested,
-            serial_widget, &SerialWidget::sendText);
+    connect(console_widget, &ConsoleWidget::sendRequested, serial_widget, &SerialWidget::sendText);
 
     // 状态栏提示直连（不中转）
     serial_widget->setStatusBar(m_status);    // 面板状态提示直连状态栏
@@ -198,38 +204,38 @@ void MainWindow::Private::buildUI_Canfd()
             [this](bool success, const QString &msg) { doCanfdOpened(success, msg); });
     connect(canfd_manager, &CanfdManager::canfdClosed, main, [this]() { doCanfdClosed(); });
     connect(canfd_manager, &CanfdManager::canfdError, main,
-            [this](const QString &msg) { doCanfdError(msg); });
+            [this](const QString &msg)            { doCanfdError(msg); });
     connect(canfd_manager, &CanfdManager::canfdOnlineChanged, main,
-            [this](bool online) { doCanfdOnlineChanged(online); });
+            [this](bool online)                   { doCanfdOnlineChanged(online); });
     connect(canfd_manager, &CanfdManager::canfdBusError, main,
             [this](uint32_t errCode, int channel) { doCanfdBusError(errCode, channel); });
-    canfd_manager->start();
+    canfd_manager->start();         // 启动 CAN-FD 管理器
 
-    // CAN-FD / UDS 升级界面直接进主区域 StackedWidget（widget 自带布局，无需页面壳）
+    // CAN-FD / UDS 升级界面直接进主区域 StackedWidget
     ui->stackedWidget->addWidget(canfd_widget);
     ui->actShowCanfd->setCheckable(true);
 
-    // UDS 升级界面独立页（actUDS 双击切换，参考 CAN-FD 页面逻辑）
+    // UDS 升级界面独立页
     ui->stackedWidget->addWidget(uds_widget);
     ui->actUDS->setCheckable(true);
-    ui->stackedWidget->setCurrentIndex(0);      // 默认图表页
+    showChartPage(View_Waveform);                        // 默认图表页（波形）
 
-    setLabelColor(ui->labOperCanfd, "gray");    // 初始状态灯
+    setLabelColor(ui->labOperCanfd, "gray");             // 初始状态灯
 }
 
 
 void MainWindow::Private::buildUI_Ethernet()
 {
-    ethernet_manager = new EthernetManager(main);
+    ether_manager = new EthernetManager(main);
 
     // 绑定网口管理器：连接状态和错误直连主窗口
-    connect(ethernet_manager, &EthernetManager::ethernetOpened, main,
+    connect(ether_manager, &EthernetManager::ethernetOpened, main,
             [this](bool success, const QString &msg) { doEthernetOpened(success, msg); });
-    connect(ethernet_manager, &EthernetManager::ethernetClosed, main,
-            [this]() { doEthernetClosed(); });
-    connect(ethernet_manager, &EthernetManager::ethernetError, main,
-            [this](const QString &msg) { doEthernetError(msg); });
-    ethernet_manager->start();
+    connect(ether_manager, &EthernetManager::ethernetClosed, main,
+            [this]()                                 { doEthernetClosed(); });
+    connect(ether_manager, &EthernetManager::ethernetError, main,
+            [this](const QString &msg)               { doEthernetError(msg); });
+    ether_manager->start();              // 启动网口管理器
 
     ui->comboNetLocalIp->clear();
     ui->comboNetLocalIp->addItem("自动");
@@ -237,7 +243,7 @@ void MainWindow::Private::buildUI_Ethernet()
     setLabelColor(ui->labOperNet, "gray");
 }
 
-void MainWindow::Private::buildRecord()                  // 日志与数据库创建
+void MainWindow::Private::buildRecord()                    // 日志与数据库创建
 {
     record_manager = new RecordManager(main);
     log_analysis   = new LogAnalysis(main);
@@ -247,55 +253,53 @@ void MainWindow::Private::buildRecord()                  // 日志与数据库�
 }
 
 void MainWindow::Private::buildChart()
-{   // 新的图表模块：管理器 + 四类视图
+{   // 新的图表模块：管理器 + 五类视图（波形/频谱/波形+频谱/XY/四宫格）
     chart_manager = new ChartManager(MAX_CHANNEL_SIZE, main);   // 32 通道：串口 CH0-4 + CANFD 映射槽
 
-    // 视图0 波形：直接放入 .ui 的 pageView
-    const int viewWave = chart_manager->createView(View_Waveform);
-    QVBoxLayout *waveLayout = new QVBoxLayout(ui->pageView);
-    waveLayout->setContentsMargins(0, 0, 0, 0);
-    waveLayout->addWidget(chart_manager->getViewWidget(viewWave));
-    for (int ch = 0; ch < MAX_CHANNEL_SIZE; ++ch)
-        chart_manager->attachChannel(viewWave, ch);             // 波形挂全部通道
-
-    // 视图1~3 频谱 / 波形+频谱 / XY：动态创建页面，跟在 pageView 后面
-    const ViewType types[3] = {View_Spectrum, View_WaveformSpectrum, View_XY};
-    for (int i = 0; i < 3; ++i) {
+    // 五类视图一视同仁：视图控件本身就是 QWidget，直接当 stackedWidget 页面；
+    // 下标 = viewIndex 登记到 m_chartPages，切页只认这张表，不认 stackedWidget 的物理下标
+    const ViewType types[5] = {View_Waveform, View_Spectrum, View_WaveformSpectrum, View_XY, View_QuadGrid};
+    m_chartPages.clear();
+    for (int i = 0; i < 5; ++i) {
         const int view = chart_manager->createView(types[i]);
-        QWidget *page = new QWidget(ui->stackedWidget);
+        QWidget *page = chart_manager->getViewWidget(view);
         ui->stackedWidget->addWidget(page);
-        QVBoxLayout *lay = new QVBoxLayout(page);
-        lay->setContentsMargins(0, 0, 0, 0);
-        lay->addWidget(chart_manager->getViewWidget(view));
+        m_chartPages.append(page);                              // 下标 = viewIndex
     }
-    chart_manager->attachChannel(1, 0);                         // 频谱：CH1
-    chart_manager->attachChannel(2, 0);                         // 波形+频谱：CH1
-    chart_manager->attachChannel(3, 0);                         // XY：A=CH1
-    chart_manager->attachChannel(3, 1);                         // XY：B=CH2
+
+    for (int ch = 0; ch < MAX_CHANNEL_SIZE; ++ch)
+        chart_manager->attachChannel(View_Waveform, ch);        // 波形挂全部通道；其余视图的通道映射由 ChartDialog 按可见性维护
 
     m_dialog = new ChartDialog(main);                       // 图表控制对话框
     m_dialog->connectManager(chart_manager, MAX_CHANNEL_SIZE);
     connect(m_dialog, &ChartDialog::viewChanged, main,
-            [this](int v) { ui->stackedWidget->setCurrentIndex(v); });   // 0~3 与四类视图页一一对应
+            [this](int viewIndex) { m_chartViewIndex = viewIndex; showChartPage(viewIndex); });
     connect(chart_manager, &ChartManager::exportFinished, main,
             [this](bool success, const QString &msg) { doExportFinished(success, msg); });
     chart_manager->setPeriod(100);                      // 设置图表刷新周期：100ms
     chart_manager->start();
 }
 
-void MainWindow::Private::build_DataHub()             // 创建数据中转站
+void MainWindow::Private::showChartPage(int viewIndex)
+{
+    if (viewIndex < 0 || viewIndex >= m_chartPages.size())  return;
+    if (QWidget *page = m_chartPages.at(viewIndex))
+        ui->stackedWidget->setCurrentWidget(page);
+}
+
+void MainWindow::Private::build_DataHub()    // 创建数据中转站
 {
     data_hub    = new DataHub;
     data_thread = new QThread(main);
     data_hub->moveToThread(data_thread);     // 中转站对象移动到数据线程
     data_hub->setManager(chart_manager);     // 设置图表管理器
-    data_hub->setSendChannels(serial_manager, canfd_manager, ethernet_manager);   // 发送路由注入：串口优先，其次网口，最后 CAN-FD 0x100
+    data_hub->setSendChannels(serial_manager, canfd_manager, ether_manager);   // 发送路由注入：串口优先，其次网口，最后 CAN-FD 0x100
 
     // 负责高频信号中转，极大减轻 UI主线程数据处理压力，避免界面卡顿。
     // 串口管理器的高频信号中转
     connect(serial_manager, &SerialManager::serialDataUpdated, data_hub, &DataHub::do_serialDataUpdated);
-    connect(ethernet_manager, &EthernetManager::ethernetDataUpdated, data_hub, &DataHub::do_ethernetDataUpdated);
-    connect(ethernet_manager, &EthernetManager::ethernetOnlineChanged, data_hub, &DataHub::setEthernetOnline);
+    connect(ether_manager,  &EthernetManager::ethernetDataUpdated, data_hub, &DataHub::do_ethernetDataUpdated);
+    connect(ether_manager,  &EthernetManager::ethernetOnlineChanged, data_hub, &DataHub::setEthernetOnline);
     connect(data_hub,       &DataHub::channelActualChanged, m_dialog, &ChartDialog::do_channelValues);   // 中转站 -> 图表控制器实际值
     connect(data_hub,       &DataHub::textOrCMDReceived,    main,
             [this](uint8_t type, const QString &str, const QByteArray &data) {
@@ -304,10 +308,10 @@ void MainWindow::Private::build_DataHub()             // 创建数据中转站
     connect(canfd_manager, &CanfdManager::canfdDataUpdated,    data_hub, &DataHub::do_canfdDataUpdated);
     connect(canfd_manager, &CanfdManager::framesSent,          data_hub, &DataHub::do_canfdFramesSent);
     connect(uds_widget,    &UdsWidget::upgradeActiveChanged,   data_hub, &DataHub::setUpgradeMode);  // 升级时旁路表格显示/图表，仅 UDS 收帧
-    connect(data_hub,  &DataHub::canfdRawReceived,  uds_widget,   &UdsWidget::onFrameReceived);   // UDS 升级：原始帧经中转站转发（工作线程收，UI 零解析开销）
-    connect(data_hub,  &DataHub::canfdRowsReceived, canfd_widget, &CanfdWidget::onFrameReceived);
-    connect(data_hub,  &DataHub::canfdRowsSent,     canfd_widget, &CanfdWidget::onFramesSent);
-    connect(data_hub,  &DataHub::canfdDropped,      main,
+    connect(data_hub,      &DataHub::canfdRawReceived,  uds_widget,   &UdsWidget::onFrameReceived);   // UDS 升级：原始帧经中转站转发（工作线程收，UI 零解析开销）
+    connect(data_hub,      &DataHub::canfdRowsReceived, canfd_widget, &CanfdWidget::onFrameReceived);
+    connect(data_hub,      &DataHub::canfdRowsSent,     canfd_widget, &CanfdWidget::onFramesSent);
+    connect(data_hub,      &DataHub::canfdDropped,      main,
             [this](int dropped, uint64_t total) { doCanfdDropped(dropped, total); });    // 发送路由：面板控件通过中转站统一发送（串口优先，否则 CAN-FD 0x100）
     serial_widget->connectHub(data_hub);            // pid_widget 在 buildUI_Others 创建后再注入
 
@@ -438,14 +442,13 @@ void MainWindow::Private::onBtnNet()
         EthernetConfig config;
         config.host = ui->editNetIp->text().trimmed();
         config.port = (quint16)ui->spinNetPort->value();
-
         const QString localAddress = ui->comboNetLocalIp->currentText();
-        if (localAddress != "自动")
+        if (localAddress != "自动") {
             config.localAddress = localAddress;
-
-        ethernet_manager->open(config);
+        }
+        ether_manager->open(config);
     } else {
-        ethernet_manager->close();
+        ether_manager->close();
     }
 }
 
@@ -587,7 +590,7 @@ void MainWindow::Private::onBtnDataExport()
 
 void MainWindow::Private::onBtnChartShow()
 {
-    ui->stackedWidget->setCurrentIndex(0);         // 显示图表
+    showChartPage(m_chartViewIndex);                        // 保持最后选择的图表视图
     m_dialog->show();
     m_status->setInfo("打开图表控制器");
 }
@@ -634,7 +637,10 @@ void MainWindow::Private::onActUseIntro()
 
 void MainWindow::Private::onActShowCanfd(bool checked)
 {
-    ui->stackedWidget->setCurrentWidget(checked ? canfd_widget : ui->pageView);
+    if (checked)
+        ui->stackedWidget->setCurrentWidget(canfd_widget);
+    else
+        showChartPage(m_chartViewIndex);                        // 回到最后选择的图表视图
 }
 
 void MainWindow::Private::onActUDS(bool checked)
@@ -643,7 +649,7 @@ void MainWindow::Private::onActUDS(bool checked)
         uds_widget->setProtocol(0);         // UDS 升级默认走 CAN-FD
         ui->stackedWidget->setCurrentWidget(uds_widget);
     } else {
-        ui->stackedWidget->setCurrentWidget(ui->pageView);
+        showChartPage(m_chartViewIndex);                        // 回到最后选择的图表视图
     }
 }
 

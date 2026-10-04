@@ -4,6 +4,7 @@
 #include "ui_chart_dialog.h"
 
 #include <cmath>
+#include <QComboBox>
 
 // 默认曲线配色：与模块 chart_def.h 目标/实际色一致，循环分配
 static const QList<QColor> kDefaultColors = {
@@ -21,10 +22,12 @@ static const QList<QColor> kDefaultColors = {
 class ChartDialog::Private
 {
 public:
-    explicit Private(ChartDialog *dlg) : dlg(dlg) {}
+    explicit Private(ChartDialog *dialog) : dialog(dialog) {}
 
     void setup();                       // UI 创建 + 通道列表信号接线
     void connectManager(ChartManager *manager, int channelCount);
+    void applyChannelMapping();         // 按当前可见通道重映射四类特殊视图
+    // UI控件操作
     void onChannelValues(const QList<double> &values);
     void onChannelName(int channel, const QString &name);
     void onChannelColor(int channel, const QColor &color);
@@ -36,7 +39,7 @@ public:
     void onClearShow();
     void onStopShow();
 
-    ChartDialog     *dlg = nullptr;
+    ChartDialog     *dialog = nullptr;
     Ui::ChartDialog *ui = nullptr;
     ChartManager    *m_manager = nullptr;
     int             m_channelCount = 0;
@@ -45,15 +48,17 @@ public:
 void ChartDialog::Private::setup()
 {
     ui = new Ui::ChartDialog;
-    ui->setupUi(dlg);
+    ui->setupUi(dialog);
+    connect(ui->comboView, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            dialog, [this](int index) { onViewChanged(index); });
 
-    // 通道列表 -> 图表管理器（lambda 以 dlg 为接收上下文，随控件销毁自动断开）
-    connect(ui->channelList, &ChannelListWidget::nameEdited, dlg,
+    // 通道列表 -> 图表管理器（lambda 以 dialog 为接收上下文，随控件销毁自动断开）
+    connect(ui->channelList, &ChannelListWidget::nameEdited,     dialog,
             [this](int channel, const QString &name) { onChannelName(channel, name); });
-    connect(ui->channelList, &ChannelListWidget::colorPicked, dlg,
+    connect(ui->channelList, &ChannelListWidget::colorPicked,    dialog,
             [this](int channel, const QColor &color) { onChannelColor(channel, color); });
-    connect(ui->channelList, &ChannelListWidget::visibleToggled, dlg,
-            [this](int channel, bool visible) { onChannelVisible(channel, visible); });
+    connect(ui->channelList, &ChannelListWidget::visibleToggled, dialog,
+            [this](int channel, bool visible)        { onChannelVisible(channel, visible); });
 }
 
 void ChartDialog::Private::connectManager(ChartManager *manager, int channelCount)
@@ -71,6 +76,8 @@ void ChartDialog::Private::connectManager(ChartManager *manager, int channelCoun
         m_manager->setChannelVisible(ch, visible);          // 默认可见性与曲线同步
         ui->channelList->addChannel(ch, QString("CH%1").arg(ch), color, visible);
     }
+
+    applyChannelMapping();                                  // 首轮映射：四类特殊视图与初始勾选状态对齐
 }
 
 void ChartDialog::Private::onChannelValues(const QList<double> &values)
@@ -96,16 +103,44 @@ void ChartDialog::Private::onChannelVisible(int channel, bool visible)
 {
     if (!m_manager) return;
     m_manager->setChannelVisible(channel, visible);
+    applyChannelMapping();                                  // 可见性变化：重映射特殊视图，不切页
+}
+
+void ChartDialog::Private::applyChannelMapping()
+{
+    if (!m_manager) return;
+
+    // 可见通道按通道号升序，特殊视图各取前 N 个：频谱/波形+频谱 取 1，XY 取 2，四宫格取 4
+    QList<int> visible;
+    for (int ch = 0; ch < m_channelCount; ++ch) {
+        if (ui->channelList->isChannelVisible(ch))
+            visible.append(ch);
+    }
+
+    QList<int> one, two, four;
+    if (!visible.isEmpty())
+        one.append(visible.at(0));
+    for (int i = 0; i < visible.size() && i < 2; ++i)
+        two.append(visible.at(i));
+    for (int i = 0; i < visible.size() && i < 4; ++i)
+        four.append(visible.at(i));
+
+    m_manager->setViewChannels(View_Spectrum,         one);
+    m_manager->setViewChannels(View_WaveformSpectrum, one);
+    m_manager->setViewChannels(View_XY,               two);
+    m_manager->setViewChannels(View_QuadGrid,         four);
 }
 
 void ChartDialog::Private::onViewChanged(int index)
 {
-    if (index < 0) return;
-    emit dlg->viewChanged(index);                           // MainWindow 切换当前视图
-    if (m_manager) {                                        // 时间/背景设置作用于当前视图
-        m_manager->setAbsTime(index, ui->comboTime->currentIndex() != 0);
+    if (index < 0)  return;
+
+    if (m_manager) {                                       // 时间/背景设置作用于当前视图
+        m_manager->setAbsTime(index,   ui->comboTime->currentIndex() != 0);
         m_manager->setBackColor(index, ui->comboColor->currentIndex());
     }
+    applyChannelMapping();                                 // 重映射由本对话框直接完成
+    emit dialog->viewChanged(index);                       // MainWindow 只负责切页
 }
 
 void ChartDialog::Private::onTimeChanged(int index)
@@ -145,29 +180,10 @@ void ChartDialog::Private::onStopShow()
 // ============================================================
 // 公共接口：委托给私有实现
 // ============================================================
-ChartDialog::ChartDialog(QWidget *parent)
-    : QDialog(parent)
-    , pimpl(new Private(this))
-{
-    pimpl->setup();
-}
-
-ChartDialog::~ChartDialog()
-{
-    delete pimpl;
-}
-
-void ChartDialog::connectManager(ChartManager *manager, int channelCount)
-{
-    pimpl->connectManager(manager, channelCount);
-}
-
-void ChartDialog::do_channelValues(const QList<double> &values)
-{
-    pimpl->onChannelValues(values);
-}
-
-void ChartDialog::on_comboView_currentIndexChanged(int index)    { pimpl->onViewChanged(index); }
+ChartDialog::ChartDialog(QWidget *parent) : QDialog(parent), pimpl(new Private(this)) { pimpl->setup(); }
+ChartDialog::~ChartDialog()                                      { delete pimpl; }
+void ChartDialog::connectManager(ChartManager *manager, int channelCount) { pimpl->connectManager(manager, channelCount); }
+void ChartDialog::do_channelValues(const QList<double> &values)  { pimpl->onChannelValues(values); }
 void ChartDialog::on_comboTime_currentIndexChanged(int index)    { pimpl->onTimeChanged(index); }
 void ChartDialog::on_comboColor_currentIndexChanged(int index)   { pimpl->onColorChanged(index); }
 void ChartDialog::on_comboRange_currentIndexChanged(int index)   { pimpl->onRangeChanged(index); }

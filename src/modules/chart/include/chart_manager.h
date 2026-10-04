@@ -27,7 +27,8 @@ typedef enum {              // 视图类型
     View_Waveform,          // 波形视图：显示通道的时域曲线，支持多通道叠加和多坐标轴
     View_Spectrum,          // 频谱视图：显示单通道的FFT频谱（单轴）
     View_WaveformSpectrum,  // 波形+频谱：上下分栏，上波形下频谱，通道同步
-    View_XY                 // XY图：通道A为X轴，通道B为Y轴
+    View_XY,                // XY图：通道A为X轴，通道B为Y轴
+    View_QuadGrid           // 四宫格：2x2 四个独立波形坐标轴
 }ViewType;
 
 // 通道数据结构体
@@ -61,7 +62,7 @@ public:
     void addData(const QList<ChannelData>& dataList);           // 批量导入：time < 0 时利用内部时间戳（仅适用于一帧多通道），time < 0 时，利用内部时间戳：仅适用于一帧多通道。
 
     // ====== 视图管理 ======
-    int  createView(ViewType type);                             // 创建视图，返回视图索引
+    int  createView(ViewType type);                             // 创建视图，返回视图索引（从0开始递增）
     void removeView(int viewIndex);                             // viewIndex=-1，移除所有视图                             // viewIndex=-1,移除所有视图
     void attachChannel(int viewIndex, int channel);             // 把通道显示到指定视图
     void detachChannel(int viewIndex, int channel);
