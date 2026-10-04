@@ -10,7 +10,7 @@
 #endif
 
 // 产品版本号：状态栏显示 / 在线更新比对 / 发布脚本解析，三处同源，只改这一行
-#define LTM_MONITOR_VERSION "0.4.5"
+#define LTM_MONITOR_VERSION "0.4.6"
 // 状态栏组件：信息显示 + 时间刷新。
 // 供各 widget 通过 setStatusBar(StatusBar*) 直连注入
 class STATUS_BAR_EXPORT StatusBar : public QWidget

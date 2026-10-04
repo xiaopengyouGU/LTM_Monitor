@@ -95,25 +95,29 @@ void UpdateChecker::Private::onReply(QNetworkReply *reply)
     }
 
     // 仓库索引里取 <Name>LTM_Project</Name> 那个包的 <Version>
+    // 注意：这里不能写成 readNextStartElement + skipCurrentElement —— 第一个起始元素就是根节点
+    // <Updates>，会把整份文档跳过，结果永远取不到组件信息。
     QXmlStreamReader xml(reply->readAll());
     QString pkgName, pkgVersion, latest;
+    bool inPackage = false;
     while (!xml.atEnd() && latest.isEmpty()) {
-        if (!xml.readNextStartElement())
-            continue;
-        const QString tag = xml.name().toString();
-        if (tag == QLatin1String("PackageUpdate")) {
-            pkgName.clear();
-            pkgVersion.clear();
-            continue;
-        }
-        if (tag == QLatin1String("Name")) {
-            pkgName = xml.readElementText().trimmed();
-        } else if (tag == QLatin1String("Version")) {
-            pkgVersion = xml.readElementText().trimmed();
+        xml.readNext();
+        if (xml.isStartElement()) {
+            const QString tag = xml.name().toString();
+            if (tag == QLatin1String("PackageUpdate")) {
+                inPackage = true;
+                pkgName.clear();
+                pkgVersion.clear();
+            } else if (inPackage && tag == QLatin1String("Name")) {
+                pkgName = xml.readElementText().trimmed();
+            } else if (inPackage && tag == QLatin1String("Version")) {
+                pkgVersion = xml.readElementText().trimmed();
+            }
+        } else if (inPackage && xml.isEndElement()
+                   && xml.name().toString() == QLatin1String("PackageUpdate")) {
             if (pkgName == QLatin1String(kPackageName))
                 latest = pkgVersion;
-        } else {
-            xml.skipCurrentElement();
+            inPackage = false;
         }
     }
 
