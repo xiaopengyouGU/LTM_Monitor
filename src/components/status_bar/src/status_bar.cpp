@@ -43,7 +43,7 @@ void StatusBar::Private::build()
     // 欢迎标签
     labWelcome = new QLabel(status);
     labWelcome->setMinimumWidth(240);
-    labWelcome->setText(" 欢迎使用：LTM-Monitor V0.4.4 ");
+    labWelcome->setText(QString(" 欢迎使用：LTM-Monitor V%1 ").arg(LTM_MONITOR_VERSION));
     layout->addWidget(labWelcome, 1);
     addSeparator(layout);
 

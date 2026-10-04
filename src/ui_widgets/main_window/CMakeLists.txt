@@ -1,7 +1,7 @@
 # ui_widgets/main_window/CMakeLists.txt
 project(main_window LANGUAGES CXX)
 
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets Network)
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)                   #编译资源文件，显示图标
@@ -13,6 +13,7 @@ set(SOURCES
     src/pid_widget.cpp
     src/serial_widget.cpp
     src/console_widget.cpp
+    src/update_checker.cpp
 )
 
 set(HEADERS
@@ -21,6 +22,7 @@ set(HEADERS
     include/pid_widget.h
     include/serial_widget.h
     include/console_widget.h
+    include/update_checker.h
 )
 
 set(UI_FILES  
@@ -49,6 +51,7 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}   PUBLIC
         Qt::Core
         Qt::Widgets
+        Qt::Network
 )
 
 #链接业务模块

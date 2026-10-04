@@ -15,6 +15,7 @@
 #include "log_analysis.h"
 #include "chart_dialog.h"
 #include "data_hub.h"
+#include "update_checker.h"
 #include "ltm_protocol.h"
 #include "modbus_master.h"
 
@@ -25,6 +26,10 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QActionGroup>
+#include <QProcess>
+#include <QTimer>
+#include <QApplication>
+#include <QPushButton>
 
 #define LOG_DEBUG(msg)  {if(record_manager) record_manager->logDebug(msg);}
 #define LOG_INFO(msg)   {if(record_manager) record_manager->logInfo(msg);}
@@ -89,6 +94,9 @@ public:
     void onActUDS(bool checked);
     void onActTerminalUtf8();
     void onActTerminalGbk();
+    void onActCheckUpdate();                 // 菜单：检查更新
+    void handleUpdateResult(bool ok, bool hasUpdate, const QString &latest, const QString &message);
+    void startOnlineUpdate();                // 启动安装器的更新程序，然后退出本程序
 
     MainWindow *main = nullptr;
 
@@ -115,6 +123,8 @@ public:
     QList<QWidget*>  m_chartPages;               // 图表视图号 -> 页面控件（下标即 viewIndex，buildChart 登记）
     int              m_chartViewIndex = 0;       // 最后选择的图表视图
     qint64           m_canfdDropLastShowMs = 0;  // CANFD 丢帧显示节流时刻
+    UpdateChecker   *m_updateChecker = nullptr;  // 在线更新检查（启动自动查一次 + 菜单手动查）
+    bool             m_checkByUser   = false;    // 本次检查是否由用户点击触发
 };
 
 MainWindow::Private::~Private()
@@ -350,6 +360,16 @@ void MainWindow::Private::buildUI_Others()          // 其余部分的UI处理
     codecGroup->addAction(ui->actTerminalUtf8);
     codecGroup->addAction(ui->actTerminalGbk);
     ui->actTerminalUtf8->setChecked(true);
+
+    // 在线更新：启动后延迟几秒自动查一次（不打断启动过程），结果统一走 handleUpdateResult
+    m_updateChecker = new UpdateChecker(main);
+    connect(m_updateChecker, &UpdateChecker::finished, main,
+            [this](bool ok, bool hasUpdate, const QString &latest, const QString &message) {
+                handleUpdateResult(ok, hasUpdate, latest, message);
+            });
+    QTimer::singleShot(3000, main, [this] {
+        if (m_updateChecker) m_updateChecker->check();
+    });
 }
 
 // ============================================================
@@ -630,6 +650,64 @@ void MainWindow::Private::onActOpenLog()                 // 打开日志分析�
     m_status->setInfo("打开日志分析器");
 }
 
+void MainWindow::Private::onActCheckUpdate()
+{
+    if (!m_updateChecker) return;
+    m_checkByUser = true;
+    m_status->setInfo("正在检查更新...");
+    m_updateChecker->check();
+}
+
+void MainWindow::Private::handleUpdateResult(bool ok, bool hasUpdate, const QString &latest, const QString &message)
+{
+    const bool byUser = m_checkByUser;      // 启动自动检查：没更新/失败都不打扰用户
+    m_checkByUser = false;
+
+    if (!ok) {
+        if (byUser)
+            QMessageBox::warning(main, "检查更新", QString("检查更新失败：%1").arg(message));
+        else
+            m_status->setInfo("检查更新失败");
+        return;
+    }
+
+    const QString current = UpdateChecker::currentVersion();
+    if (!hasUpdate) {
+        if (byUser)
+            QMessageBox::information(main, "检查更新", QString("当前已是最新版本 v%1。").arg(current));
+        else
+            m_status->setInfo(QString("当前已是最新版本 v%1").arg(current));
+        return;
+    }
+
+    m_status->setInfo(QString("发现新版本 v%1").arg(latest));
+    const QString text = QString("发现新版本 v%1（当前 v%2）。\n\n是否立即更新？\n程序会关闭并启动更新程序。")
+                             .arg(latest, current);
+    QMessageBox box(QMessageBox::Question, "发现新版本", text, QMessageBox::NoButton, main);
+    QPushButton *btnUpdate = box.addButton("立即更新", QMessageBox::AcceptRole);
+    box.addButton("稍后", QMessageBox::RejectRole);
+    box.setDefaultButton(btnUpdate);
+    box.exec();
+    if (box.clickedButton() == btnUpdate)
+        startOnlineUpdate();
+}
+
+void MainWindow::Private::startOnlineUpdate()
+{
+    const QString tool = UpdateChecker::maintenanceToolPath();
+    if (tool.isEmpty()) {
+        QMessageBox::warning(main, "在线更新",
+                             "没有找到更新程序（maintenancetool.exe）。\n当前不是通过安装包安装的版本，无法在线更新。");
+        return;
+    }
+    // 更新过程要替换本程序文件，所以先拉起更新程序，再退出本程序
+    if (!QProcess::startDetached(tool, QStringList() << "--start-updater")) {
+        QMessageBox::warning(main, "在线更新", "启动更新程序失败，请手动运行安装目录下的 maintenancetool.exe。");
+        return;
+    }
+    QApplication::quit();
+}
+
 void MainWindow::Private::onActUseIntro()
 {
     console_widget->showHelp();     // 与帮助按键的输出一致（控制台组件）
@@ -700,6 +778,7 @@ void MainWindow::on_actShowCanfd_triggered(bool checked) { pimpl->onActShowCanfd
 void MainWindow::on_actUDS_triggered(bool checked)       { pimpl->onActUDS(checked); }
 void MainWindow::on_actTerminalUtf8_triggered()          { pimpl->onActTerminalUtf8(); }
 void MainWindow::on_actTerminalGbk_triggered()           { pimpl->onActTerminalGbk(); }
+void MainWindow::on_actCheckUpdate_triggered()           { pimpl->onActCheckUpdate(); }
 
 // ============================================================
 // 内部函数

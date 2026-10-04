@@ -34,6 +34,7 @@ private slots:
     void on_actUDS_triggered(bool checked);         // 切换到 UDS 升级窗口
     void on_actTerminalUtf8_triggered();            // 控制台编码：UTF-8
     void on_actTerminalGbk_triggered();             // 控制台编码：GBK
+    void on_actCheckUpdate_triggered();             // 检查更新
 
 private:
     class Private;
