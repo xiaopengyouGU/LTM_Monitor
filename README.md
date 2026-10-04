@@ -1,17 +1,22 @@
 # LTM-Monitor – 基于 Qt6 的监控调试上位机
 
-基于 **Qt 6** 开发的监控调试上位机，支持串口 / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
-1000Hz 实时动态曲线、最大支持32通道、在线 PID 调参、CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出。
+基于 **Qt 6** 开发的监控调试上位机，支持串口 / **网口（Ethernet TCP）** / CAN / CAN-FD / **LTM-over-CANFD** 通讯、
+1000Hz 实时动态曲线（波形 / 频谱 / 波形+频谱 / XY / 四宫格）、最大支持 32 通道、在线 PID 调参、
+CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出与**在线更新**。
 
 ## 安装包
 
-安装包 **LTM_Monitor_Installer.exe** 见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Monitor_V0.4.0)。
+当前版本 **v0.4.6**（2026-10-04），安装包见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Monitor_V0.4.0)（Windows 64 位，GPL 开源）。
+
+安装目录内自带维护工具 `maintenancetool.exe`：程序启动时会自动检查一次新版本，也可在
+**关于… → 检查更新** 手动检查。确认后程序退出、更新器接管，只下载有变化的组件（通常 2MB 左右），
+不需要重新下载完整安装包。
 
 ## 软件界面
 
 <div align="center">
     <img src="documents/images/界面1.png" alt="主界面">
-    <p><em>主界面 - 串口/CAN-FD通讯、实时曲线显示、数据记录</em></p>
+    <p><em>主界面 - 串口 / 网口 / CAN-FD 通讯、实时曲线显示、数据记录</em></p>
 </div>
 
 <div align="center">
@@ -32,10 +37,12 @@
 
 - **1000Hz 实时曲线流畅不卡**：传输层批量转发（按批投递，非逐帧跨线程）、数据线程集中解析、
   图表环形缓冲 + LTTB 降采样，实测 1000Hz 曲线与表格刷新丝滑。
-- **双介质 LTM 协议**：同一套 LTM 协议跑串口与 CAN-FD（0x100 下行广播 / 0x101 上行上报，
-  收发分 ID，多电机总线不冲突），协议层与传输层完全解耦。
+- **一套 LTM 协议跑三种介质**：串口 / 网口 / CAN-FD 共用同一套 LTM 协议（CAN-FD 走 0x100 下行广播 /
+  0x101 上行上报，收发分 ID，多电机总线不冲突），协议层与传输层完全解耦。
+- **网口通讯（Ethernet TCP Client）**：上位机主动连接设备，本机网卡与设备端口可选；网口有独立的
+  LTM 解析状态，与串口互不污染。发送按 串口 → 网口 → CAN-FD 顺序选路，接哪个用哪个。
 - **协议解析组件化**：LTM / Modbus 协议器、环形缓冲、CRC16 全部收在 `components/protocol`
-  （Pimpl，与介质无关），串口 / CAN-FD 共用一套解析。
+  （Pimpl，与介质无关），串口 / 网口 / CAN-FD 共用一套解析。
 - **CAN-FD 协议映射**：DBC / JSON 协议导入（DataMap），信号级解码 + 图表映射表，免改代码适配新报文。
 - **IAP / UDS 双通道烧录**：串口 IAP（LTM 协议）+ CAN-FD UDS（ISO-TP），配合 BootLoader
   实现产线/现场升级，调试烧录一条龙。
@@ -43,6 +50,8 @@
 - **CSV 数据导出**：时间戳保留 4 位小数，通道数值动态小数位，可配置导出时长。
 - **高频健壮性**：CAN-FD 积压帧过滤（避免恢复读取时时间轴突跳）、丢帧限频提示、源头格式化
   （表格行在数据线程格式化，UI 零字符串加工）。
+- **在线更新**：更新仓库放在 Gitee 的一个分支，安装包按功能拆成 6 个组件；改一次上位机，客户端
+  只拉有变化的组件，索引与包完整性由仓库里的 SHA1 校验。
 
 ## 通讯协议移植
 
@@ -69,16 +78,17 @@
 
 ```
 传输层（modules）              协议层（components）                组合层（DataHub）
-serial —— 纯字节收发        protocol/LTM_Protocol  ──┐
-canfd  —— 纯帧收发         protocol/Modbus_Protocol ─┼─→ 字节流 → 协议解析 → 图表/PID/命令分发
-                           protocol/Modbus_Master ──┘       发送路由：串口优先，否则 CAN-FD
+serial   —— 纯字节收发      protocol/LTM_Protocol  ──┐
+ethernet —— TCP 字节收发    protocol/Modbus_Protocol ─┼─→ 字节流 → 协议解析 → 图表/PID/命令分发
+canfd    —— 纯帧收发        protocol/Modbus_Master ──┘   发送路由：串口 → 网口 → CAN-FD 0x100
 ```
 
-- **传输层**（`modules/serial`、`modules/canfd`）：只做设备管理、字节/帧收发、轮询，不感知任何协议。
+- **传输层**（`modules/serial`、`modules/ethernet`、`modules/canfd`）：只做设备管理、字节/帧收发、轮询
+  与连接状态上报，不感知任何协议。
 - **协议层**（`components/protocol`）：LTM / Modbus 打包拆包、环形缓冲、CRC16、Modbus 主站事务器，
   全部 Pimpl，与介质无关，可独立测试。
-- **组合层**（`DataHub`，位于 `ui_widgets/main_window`）：串口字节按协议模式分发、
-  CAN-FD 0x101 上行 LTM 解析、发送统一路由（串口在线走串口，否则 CAN-FD 0x100 分片）。
+- **组合层**（`DataHub`，位于 `ui_widgets/main_window`）：串口 / 网口字节按协议模式分发、
+  CAN-FD 0x101 上行 LTM 解析、发送统一路由（串口在线走串口，其次网口，最后 CAN-FD 0x100 分片）。
 
 ## 项目目录结构
 
@@ -90,9 +100,10 @@ LTM_Monitor/
 │   ├── STM32/                 # STM32F103C8T6 最小系统板移植示例
 │   └── Renesas/               # 野火 RA6T2 电机开发板移植示例
 ├── src/
-│   ├── modules/               # 传输层动态库（纯收发，不感知协议）
-│   │   ├── chart/             # 图表动态库（实时曲线、LTTB、数据导出）
+│   ├── modules/               # 传输层与核心能力库
+│   │   ├── chart/             # 图表动态库（5 类视图、LTTB/M4 降采样、FFT、导入导出）
 │   │   ├── serial/            # 串口传输动态库（字节收发）
+│   │   ├── ethernet/          # 网口传输动态库（TCP Client 字节收发）
 │   │   ├── canfd/             # CAN-FD 传输动态库（帧收发、厂商 SDK 隔离）
 │   │   └── record/            # 数据记录动态库（数据库与日志系统）
 │   ├── components/            # 协议/映射层组件（与介质无关）
@@ -102,7 +113,7 @@ LTM_Monitor/
 │   │   ├── uds_server/        # UDS 升级服务（IAP/UDS 双通道共用）
 │   │   └── status_bar/        # 自定义状态栏
 │   ├── ui_widgets/
-│   │   ├── main_window/       # 主窗口 + DataHub（协议组合层）
+│   │   ├── main_window/       # 主窗口 + DataHub（协议组合层）+ 在线更新检查
 │   │   ├── chart_dialog/      # 图表设置对话框
 │   │   ├── canfd_widget/      # CAN-FD 分析界面（表格抓包 + 映射）
 │   │   ├── uds_widget/        # UDS/IAP 升级界面

@@ -10,7 +10,7 @@ ui_widgets    MainWindow（壳）+ DataHub（数据中转站）+ 各业务 Widge
 components    可独立复用的组件（无业务线程）
                 protocol / chart_map / data_map / uds_server / status_bar
 modules       传输层与核心能力库
-                serial / canfd / chart / record
+                serial / ethernet / canfd / chart / record
 ```
 
 依赖关系是单向的（自上而下），同层模块间是完全解耦合的。components 不依赖 UI 和传输层，
@@ -19,22 +19,23 @@ modules       传输层与核心能力库
 各模块的职责：
 
 
-| 模块                   | 职责                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| modules/chart          | 图表核心：DataStorage 环形存储 / ChartManager 门面 / ChartController 渲染适配 / 导入导出 / FFT / 降采样 |
-| modules/serial         | 串口纯字节收发，与协议层无关                                                                            |
-| modules/canfd          | CAN-FD 纯帧收发：Controller 隔离硬件差异，Worker 周期轮询                                               |
-| modules/record         | 日志 + 数据库，全部异步操作，不阻塞 UI                                                                  |
-| components/protocol    | LTM / Modbus 打包拆包、环形缓冲、CRC16、Modbus 主站事务器，全部 Pimpl，与介质无关                       |
-| components/chart_map   | 数据源信号 → 图表通道的统一映射表                                                                      |
-| components/data_map    | DBC / 自定义 JSON 协议按位解码                                                                          |
-| components/uds_server  | 硬件无关的 UDS 升级协议引擎（与 BootLoader 状态机镜像）                                                 |
-| components/status_bar  | 状态栏控件，供各 Widget 直连注入                                                                        |
-| ui_widgets/main_window | 壳 + 全部接线；DataHub 是唯一数据中转站                                                                 |
+| 模块                   | 职责                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| modules/chart          | 图表核心：DataStorage 环形存储 / ChartManager 门面 / ChartController 渲染适配（5 类视图）/ 导入导出 / FFT / 降采样 |
+| modules/serial         | 串口纯字节收发，与协议层无关                                                                                       |
+| modules/ethernet       | 网口 TCP Client：Manager 门面 + Worker 独占 socket，连接超时与在线状态上报                                         |
+| modules/canfd          | CAN-FD 纯帧收发：Controller 隔离硬件差异，Worker 周期轮询                                                          |
+| modules/record         | 日志 + 数据库，全部异步操作，不阻塞 UI                                                                             |
+| components/protocol    | LTM / Modbus 打包拆包、环形缓冲、CRC16、Modbus 主站事务器，全部 Pimpl，与介质无关                                  |
+| components/chart_map   | 数据源信号 → 图表通道的统一映射表                                                                                  |
+| components/data_map    | DBC / 自定义 JSON 协议按位解码                                                                                     |
+| components/uds_server  | 硬件无关的 UDS 升级协议引擎（与 BootLoader 状态机镜像）                                                            |
+| components/status_bar  | 状态栏控件，供各 Widget 直连注入                                                                                   |
+| ui_widgets/main_window | 壳 + 全部接线；DataHub 是唯一数据中转站；UpdateChecker 负责在线更新检查                                            |
 
 ## 2. 线程模型与数据流
 
-项目共 5 个执行上下文 + 1 个线程池：
+项目共 6 个执行上下文 + 1 个线程池：
 
 
 | 执行上下文          | 归属                                               | 职责                              |
@@ -42,6 +43,7 @@ modules       传输层与核心能力库
 | UI 主线程           | MainWindow / 全部 Widget / ChartManager 刷新定时器 | 界面、绘图、广播                  |
 | data_thread         | DataHub                                            | 高频数据加工与分发                |
 | 串口线程            | SerialWorker                                       | 串口读写                          |
+| 网口线程            | EthernetWorker                                     | TCP 连接、字节收发、错误上报      |
 | CAN-FD 线程         | CanfdWorker                                        | 20ms 周期轮询收帧（升级时切 3ms） |
 | 记录线程            | RecordWorker / LogWorker                           | 日志与数据库异步落盘              |
 | QtConcurrent 线程池 | ChartManager 刷新任务                              | 并行取数 / 降采样 / FFT           |
@@ -54,6 +56,11 @@ modules       传输层与核心能力库
                  ▼
             DataHub(data_thread) ──按模式分发 LTM / Common / Modbus──> textOrCMDReceived ──> 控制台/状态栏
                  │ channelActualChanged（节流）──> ChartDialog 实际值 / PidWidget
+
+网口设备 ──> EthernetWorker（只转字节）
+                 │ ethernetDataUpdated
+                 ▼
+            DataHub(data_thread)：LTM 解析（独立解析状态，主机时间基准）──> channelActualChanged ──> 图表/PID
 
 CAN-FD 设备 ──> CanfdWorker（只转帧）
                  │ canfdDataUpdated
@@ -81,6 +88,8 @@ DataHub ──addData──> ChartManager(UI线程) ──> DataStorage
 - LTM 协议与介质无关：串口和 CAN-FD 共用同一套解析。发送路由串口优先，串口不在线时
   组装 CAN-FD 0x100 帧；0x100 下行 / 0x101 上行收发分 ID，多电机总线不冲突。
 - 升级模式是 DataHub 的一个开关（setUpgradeMode）：只把原始帧喂 UdsWidget，表格/图表自动旁路。
+- 在线更新检查走 QtNetwork，纯异步：启动后 3 秒发起一次，5 秒拿不到索引即判失败，只写状态栏，
+  不弹窗、不打断使用；有新版才会弹对话框。
 
 ## 3. 代码里的约定
 
@@ -98,40 +107,42 @@ DataHub ──addData──> ChartManager(UI线程) ──> DataStorage
 ## 4. 关键性能决策
 
 
-| 决策                                         | 原因                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------- |
-| 全项目 Pimpl                                 | 头文件 = 纯接口面，编译隔离，实现细节不泄漏                         |
-| DataStorage 环形缓冲预分配（20 万点/通道）   | 写入 O(1)，不扩容、不搬移；超限覆盖最旧                             |
-| M4 降采样首尾点单独保留、桶内极值按 x 序追加 | 桶内 min/max 乱拼会产生折返锯齿——V0.2 毛刺的根因                  |
-| LTTB 上限 4500 且留 2                        | 数据量限制保证容量足够，留 2 给 M4 首尾点                           |
-| FFT 复用 raw.times 作虚部                    | 原地变换不额外分配；N 向下取 2 的幂，幅度谱只算前半段，省近一半运算 |
-| 平均采样率由相邻时间戳估算（(n-1)/ΣΔt）    | 非均匀采样下的最佳近似，rate_N 预计算避免每 bin 一次除法            |
-| 汉宁窗 ×2 补偿                              | 相干增益 0.5，乘 2 后峰值幅度与矩形窗一致                           |
-| 并行取数 + QFutureWatcher 异步收尾           | 每通道一个任务，主线程零阻塞，单通道失败隔离                        |
-| 相对时间平移在并行任务内完成                 | COW detach 发生在工作线程，主线程广播零拷贝                         |
-| 导入/导出按列批量处理                        | 单次加锁，避免逐点加锁                                              |
-| 刷新去重用 dataVersion                       | 无新数据时不触发全量取数                                            |
-| 升级轮询 20ms → 3ms                         | 缩短升级耗时，结束即恢复                                            |
+| 决策                                               | 原因                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 全项目 Pimpl                                       | 头文件 = 纯接口面，编译隔离，实现细节不泄漏                                                         |
+| DataStorage 环形缓冲预分配（20 万点/通道）         | 写入 O(1)，不扩容、不搬移；超限覆盖最旧                                                             |
+| M4 降采样首尾点单独保留、桶内极值按 x 序追加       | 桶内 min/max 乱拼会产生折返锯齿——V0.2 毛刺的根因                                                    |
+| LTTB 上限 4500 且留 2                              | 数据量限制保证容量足够，留 2 给 M4 首尾点                                                           |
+| FFT 复用 raw.times 作虚部                          | 原地变换不额外分配；N 向下取 2 的幂，幅度谱只算前半段，省近一半运算                                 |
+| 平均采样率由相邻时间戳估算（(n-1)/ΣΔt）            | 非均匀采样下的最佳近似，rate_N 预计算避免每 bin 一次除法                                            |
+| 汉宁窗 ×2 补偿                                     | 相干增益 0.5，乘 2 后峰值幅度与矩形窗一致                                                           |
+| 并行取数 + QFutureWatcher 异步收尾                 | 每通道一个任务，主线程零阻塞，单通道失败隔离                                                        |
+| 相对时间平移在并行任务内完成                       | COW detach 发生在工作线程，主线程广播零拷贝                                                         |
+| 导入/导出按列批量处理                              | 单次加锁，避免逐点加锁                                                                              |
+| 刷新去重用 dataVersion                             | 无新数据时不触发全量取数                                                                            |
+| 升级轮询 20ms → 3ms                                | 缩短升级耗时，结束即恢复                                                                            |
+| QCustomPlot 关抗锯齿 + phFastPolylines             | Qt6/Windows 对"非抗锯齿 + 线宽>1"的折线走病态慢路径：实测 3816 点、882x520 视口单帧 870ms 降到 10ms |
+| 图例一律显式挂载（关 setAutoAddPlottableToLegend） | 默认图例挂在左上轴矩形上，四宫格会把四条曲线全塞进第一格，必须每个面板独立图例                      |
 
 ## 5. 用到的设计模式
 
 - **Pimpl（桥接）**：全项目 40+ 类，用得最多。头文件只剩接口，实现随便改。
 - **观察者**：Qt 信号槽，事件分发，无处不在。
 - **中介者**：DataHub，多数据源汇聚、多消费者解耦、升级旁路开关。
-- **门面**：ChartManager / SerialManager / CanfdManager / RecordManager / UdsServer，对外只留一个入口。
-- **工作对象**：SerialWorker / CanfdWorker / RecordWorker，moveToThread 线程化。
+- **门面**：ChartManager / SerialManager / EthernetManager / CanfdManager / RecordManager / UdsServer，对外只留一个入口。
+- **工作对象**：SerialWorker / EthernetWorker / CanfdWorker / RecordWorker，moveToThread 线程化。
 - **生产者-消费者**：工作线程 → 信号槽队列 → data_thread / UI，跨线程无锁数据流。
 
 ## 6. 代码量分布（不含 third_party / 压测 / .ui）
 
-总计约 **10736 行 / 84 文件**：
+总计约 **12216 行 / 95 文件**：
 
 
 | 分层        | 行数 | 占比 |
 | ----------- | ---- | ---- |
-| modules     | 4633 | 43%  |
-| ui_widgets  | 4176 | 39%  |
-| components  | 1911 | 18%  |
+| modules     | 5647 | 46%  |
+| ui_widgets  | 4592 | 38%  |
+| components  | 1961 | 16%  |
 | application | 16   | 0%   |
 
 大头在 modules（驱动隔离、图表性能、异步落盘）和 ui_widgets（接线 + DataHub）；
@@ -144,7 +155,7 @@ components 行数最少，但协议解析和映射都在这。
 3. mainwindow.cpp 的 build*() 系列——感受各模块是如何组织起来的。
 4. data_hub.cpp——数据中转站，负责原始数据加工和分发。
 5. components——各种小组件。
-6. modules/serial → modules/canfd——驱动封装 + 协议承载。
+6. modules/serial → modules/ethernet → modules/canfd——驱动封装 + 协议承载。
 7. modules/chart（高性能图表模块）——DataStorage（存储+降采样）→ ChartManager（门面+并行刷新）→ ChartController（渲染）。
 8. modules/record——异步日志读写。
 9. chart/tests 压测——性能基准。
