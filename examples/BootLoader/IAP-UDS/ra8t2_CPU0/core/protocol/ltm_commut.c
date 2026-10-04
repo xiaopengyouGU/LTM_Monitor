@@ -1,3 +1,7 @@
+/* LTM 通讯协议本体（副本）：MIT 许可，可自由集成到闭源固件。
+ * SPDX-License-Identifier: MIT
+ * 完整条款见本目录 LICENSE，或 examples/protocol/LICENSE。
+ */
 #include "protocol/ltm_commut.h"
 #include "protocol/protocol.h"
 
