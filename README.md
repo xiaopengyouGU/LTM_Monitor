@@ -128,11 +128,15 @@ LTM_Monitor/
 
 ## 许可证
 
-本项目分两部分授权：
+本仓库分层授权，按目录区分：
 
-- **上位机**（`src/`、安装包等）：**GNU General Public License v3.0（GPLv3）**，全文见根目录 `LICENSE`。
-- **协议移植代码**（`examples/protocol/`）：**MIT**，全文见该目录下的 `LICENSE`。协议本体是纯 C、无依赖，
-  可直接集成到闭源固件，只需保留版权与许可声明。
+| 路径 | 许可证 | 说明 |
+| --- | --- | --- |
+| `src/`、`CMakeLists.txt`、`documents/` | **GPLv3** | 上位机全部源码与文档，全文见根目录 [`LICENSE`](LICENSE) |
+| 安装包工程（本仓库 `installer_project` 分支） | **GPLv3** | 安装器配置、组件定义与发布脚本 |
+| `examples/protocol/` | **MIT** | 通讯协议本体（纯 C、无依赖），可自由集成到闭源固件，只需保留版权与许可声明，全文见 [`examples/protocol/LICENSE`](examples/protocol/LICENSE) |
+| `examples/STM32/`、`examples/Renesas/` | **GPLv3** | 协议移植示例工程；内嵌的 `protocol/` 副本来自 MIT 的协议本体 |
+| `examples/BootLoader/` | **GPLv3** | 串口 IAP / CAN-FD UDS 下位机示例；`core/protocol/` 副本同样来自 MIT 协议本体 |
+| `src/**/third_party/` | 各自许可 | QCustomPlot（GPLv3）、spdlog（MIT）、ZLG zcan 厂商 SDK（随厂商授权） |
 
-`examples/` 下的其他内容（STM32 / Renesas 移植示例、BootLoader 示例）整体沿用 GPLv3；
-其中内嵌的 `protocol/` 副本来自 MIT 的协议本体。
+一句话：**上位机 GPLv3，协议本体 MIT**——把协议搬进自己固件的人不必开源固件；改上位机则需遵守 GPLv3。
