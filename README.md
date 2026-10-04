@@ -136,5 +136,3 @@ LTM_Monitor/
 | `examples/` | **MIT** | 协议本体与全部下位机侧示例（`protocol/`、`STM32/`、`Renesas/`、`BootLoader/`），全文见 [`examples/LICENSE`](examples/LICENSE) |
 | 安装包工程（本仓库 `installer_project` 分支） | **MIT** | 安装器配置、组件定义与发布脚本；其中安装向导展示的 `license.txt` 描述的是上位机本体，内容仍为 GPLv3 |
 | `src/**/third_party/` | 各自许可 | QCustomPlot（GPLv3）、spdlog（MIT）、ZLG zcan 厂商 SDK（随厂商授权） |
-
-一句话：**只有上位机是 GPLv3，其余都是 MIT**——协议和示例可以自由进闭源固件，改上位机源码则需遵守 GPLv3。
