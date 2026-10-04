@@ -132,11 +132,9 @@ LTM_Monitor/
 
 | 路径 | 许可证 | 说明 |
 | --- | --- | --- |
-| `src/`、`CMakeLists.txt`、`documents/` | **GPLv3** | 上位机全部源码与文档，全文见根目录 [`LICENSE`](LICENSE) |
-| 安装包工程（本仓库 `installer_project` 分支） | **GPLv3** | 安装器配置、组件定义与发布脚本 |
-| `examples/protocol/` | **MIT** | 通讯协议本体（纯 C、无依赖），可自由集成到闭源固件，只需保留版权与许可声明，全文见 [`examples/protocol/LICENSE`](examples/protocol/LICENSE) |
-| `examples/STM32/`、`examples/Renesas/` | **GPLv3** | 协议移植示例工程；内嵌的 `protocol/` 副本来自 MIT 的协议本体 |
-| `examples/BootLoader/` | **GPLv3** | 串口 IAP / CAN-FD UDS 下位机示例；`core/protocol/` 副本同样来自 MIT 协议本体 |
+| `src/`、`CMakeLists.txt`、`script.py`、`documents/` | **GPLv3** | 上位机本体（唯一 GPLv3 的部分），全文见根目录 [`LICENSE`](LICENSE) |
+| `examples/` | **MIT** | 协议本体与全部下位机侧示例（`protocol/`、`STM32/`、`Renesas/`、`BootLoader/`），全文见 [`examples/LICENSE`](examples/LICENSE) |
+| 安装包工程（本仓库 `installer_project` 分支） | **MIT** | 安装器配置、组件定义与发布脚本；其中安装向导展示的 `license.txt` 描述的是上位机本体，内容仍为 GPLv3 |
 | `src/**/third_party/` | 各自许可 | QCustomPlot（GPLv3）、spdlog（MIT）、ZLG zcan 厂商 SDK（随厂商授权） |
 
-一句话：**上位机 GPLv3，协议本体 MIT**——把协议搬进自己固件的人不必开源固件；改上位机则需遵守 GPLv3。
+一句话：**只有上位机是 GPLv3，其余都是 MIT**——协议和示例可以自由进闭源固件，改上位机源码则需遵守 GPLv3。
