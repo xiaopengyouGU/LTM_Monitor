@@ -126,4 +126,13 @@ LTM_Monitor/
 └── README.md
 ```
 
-本项目基于 **GNU General Public License v3.0（GPLv3）** 开源，详细条款见项目根目录的 `LICENSE` 文件。
+## 许可证
+
+本项目分两部分授权：
+
+- **上位机**（`src/`、安装包等）：**GNU General Public License v3.0（GPLv3）**，全文见根目录 `LICENSE`。
+- **协议移植代码**（`examples/protocol/`）：**MIT**，全文见该目录下的 `LICENSE`。协议本体是纯 C、无依赖，
+  可直接集成到闭源固件，只需保留版权与许可声明。
+
+`examples/` 下的其他内容（STM32 / Renesas 移植示例、BootLoader 示例）整体沿用 GPLv3；
+其中内嵌的 `protocol/` 副本来自 MIT 的协议本体。
