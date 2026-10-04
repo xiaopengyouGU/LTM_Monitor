@@ -6,7 +6,7 @@ CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出与**�
 
 ## 安装包
 
-当前版本 **v0.4.6**（2026-10-04），安装包见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Monitor_V0.4.0)（Windows 64 位，GPL 开源）。
+当前版本 **v0.4.6**（2026-10-04），安装包见 [**安装包下载**](https://gitee.com/xiaopengyouGU/LTM_Monitor/releases/tag/LTM_Monitor_V0.4.0)（Windows 64 位，GPLv3 开源）。
 
 安装目录内自带维护工具 `maintenancetool.exe`：程序启动时会自动检查一次新版本，也可在
 **关于… → 检查更新** 手动检查。确认后程序退出、更新器接管，只下载有变化的组件（通常 2MB 左右），
@@ -126,4 +126,4 @@ LTM_Monitor/
 └── README.md
 ```
 
-本项目基于 **GNU General Public License (GPL)** 开源，详细条款请见项目中的 `LICENSE` 文件。
+本项目基于 **GNU General Public License v3.0（GPLv3）** 开源，详细条款见项目根目录的 `LICENSE` 文件。
