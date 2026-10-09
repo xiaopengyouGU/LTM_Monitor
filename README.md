@@ -20,6 +20,11 @@ CAN-FD 协议映射解析、**IAP/UDS 双通道烧录**、CSV 数据导出与**�
 </div>
 
 <div align="center">
+    <img src="documents/images/界面2.png" alt="四宫格视图">
+    <p><em>四宫格视图 - 同时显示四路通道，X 轴共用、Y 轴各自缩放</em></p>
+</div>
+
+<div align="center">
     <img src="documents/images/界面3.png" alt="CAN-FD 界面">
     <p><em>CAN-FD 界面 - CAN/CAN-FD通讯、数据记录、定时发送</em></p>
 </div>
